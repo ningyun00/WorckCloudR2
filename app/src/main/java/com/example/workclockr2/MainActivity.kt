@@ -78,6 +78,8 @@ fun WorkClockApp(context: Context) {
     var createName by remember { mutableStateOf("") }
     var createRole by remember { mutableStateOf("employee") }
     var busy by remember { mutableStateOf(false) }
+    var testingConnection by remember { mutableStateOf(false) }
+    var creatingEmployee by remember { mutableStateOf(false) }
     var loginId by remember { mutableStateOf("") }
     var loginPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
@@ -334,17 +336,17 @@ fun WorkClockApp(context: Context) {
                                     FilterChip(selected = createRole == "admin", onClick = { createRole = "admin" }, label = { Text("管理员") })
                                 }
                                 Text("初始密码为六位工号，首次登录需要修改。", color = Muted, fontSize = 12.sp)
-                                Button(enabled = !busy && createId.length == 6 && createName.isNotBlank(), onClick = {
+                                Button(enabled = !creatingEmployee && !busy && createId.length == 6 && createName.isNotBlank(), onClick = {
                                     scope.launch {
-                                        busy = true
+                                        creatingEmployee = true
                                         try {
                                             val store = R2Store(R2Config(account,bucket,access,secret,ssid))
                                             withContext(Dispatchers.IO) { val list = store.readEmployees(); require(list.none { it.employeeId == createId }) { "该工号已存在" }; store.writeEmployees(list + R2Store.createEmployee(createId,createName.trim(),createRole,createId,true,true)) }
                                             message = "账号创建成功，初始密码为工号"; createId = ""; createName = ""
                                         } catch (e: Exception) { message = "创建失败：" + (e.message ?: "请检查 R2 写权限") }
-                                        finally { busy = false }
+                                        finally { creatingEmployee = false }
                                     }
-                                }) { Text(if (busy) "正在创建…" else "创建并分配账号") }
+                                }) { Text(if (creatingEmployee) "正在创建…" else "创建并分配账号") }
                                 if (message.isNotBlank()) Text(message, color = Blue, fontSize = 12.sp)
                             }
                         }
@@ -353,14 +355,14 @@ fun WorkClockApp(context: Context) {
                 confirmButton = { if (settingsPage == 0 || role != "admin" || !loggedIn) Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") } else TextButton(onClick = { showSettings = false }) { Text("完成") } },
                 dismissButton = {
                     Row {
-                        TextButton(enabled = !busy && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {
+                        TextButton(enabled = !testingConnection && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {
                             scope.launch {
-                                busy = true; connectionTest = "正在测试连接…"
+                                testingConnection = true; connectionTest = "正在测试连接…"
                                 try { connectionTest = withContext(Dispatchers.IO) { R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid)).testConnection() } }
                                 catch (e: Exception) { connectionTest = "测试异常：${e.message ?: e.javaClass.simpleName}" }
-                                finally { busy = false }
+                                finally { testingConnection = false }
                             }
-                        }) { Text("测试连接") }
+                        }) { Text(if (testingConnection) "正在测试…" else "测试连接") }
                         if (configured) TextButton(onClick = { showSettings = false }) { Text("取消") }
                     }
                 })
