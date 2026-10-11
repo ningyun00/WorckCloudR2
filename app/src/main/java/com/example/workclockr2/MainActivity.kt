@@ -69,6 +69,12 @@ fun WorkClockApp(context: Context) {
     var status by remember { mutableStateOf("尚未打卡") }
     var message by remember { mutableStateOf("") }
     var connectionTest by remember { mutableStateOf("") }
+    var settingsPage by remember { mutableIntStateOf(0) }
+    var adminNewPassword by remember { mutableStateOf("") }
+    var adminConfirmPassword by remember { mutableStateOf("") }
+    var createId by remember { mutableStateOf("") }
+    var createName by remember { mutableStateOf("") }
+    var createRole by remember { mutableStateOf("employee") }
     var busy by remember { mutableStateOf(false) }
     var loginId by remember { mutableStateOf("") }
     var loginPassword by remember { mutableStateOf("") }
@@ -281,16 +287,65 @@ fun WorkClockApp(context: Context) {
             }
         }
         if (showSettings) {
-            AlertDialog(onDismissRequest = { if (configured) showSettings = false }, title = { Text("Cloudflare R2 配置") },
+            AlertDialog(onDismissRequest = { if (configured) showSettings = false }, title = { Text(if (role == "admin") "管理设置" else "Cloudflare R2 配置") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("请填写 R2 S3 API 凭据。桶已固定为 workcloudr2。测试连接会读取 employees.json，并区分常见错误。密钥保存在本机，但仍可能被提取。", color = Muted, fontSize = 12.sp)
-                        OutlinedTextField(account, { account = it }, label = { Text("Account ID") }, singleLine = true)
-                        Text("存储桶：workcloudr2（已固定，无需选择）", color = Ink, fontWeight = FontWeight.Medium)
-                        OutlinedTextField(access, { access = it }, label = { Text("Access Key ID") }, singleLine = true)
-                        OutlinedTextField(secret, { secret = it }, label = { Text("Secret Access Key") }, singleLine = true)
-                        OutlinedTextField(ssid, { ssid = it }, label = { Text("指定 WiFi 名称（可选）") }, singleLine = true)
-                        if (connectionTest.isNotBlank()) Text(connectionTest, color = if (connectionTest.startsWith("连接成功")) Color(0xFF16865C) else Blue, fontSize = 12.sp)
+                        if (role == "admin") {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+                                listOf("R2 配置", "修改密码", "分配新用户").forEachIndexed { index, label ->
+                                    TextButton(onClick = { settingsPage = index }) { Text(if (settingsPage == index) "● " + label else label) }
+                                }
+                            }
+                        }
+                        when (if (role == "admin") settingsPage else 0) {
+                            0 -> {
+                                Text("R2 S3 API 凭据。桶固定为 workcloudr2。", color = Muted, fontSize = 12.sp)
+                                OutlinedTextField(account, { account = it }, label = { Text("Account ID") }, singleLine = true)
+                                Text("存储桶：workcloudr2（固定）", color = Ink, fontWeight = FontWeight.Medium)
+                                OutlinedTextField(access, { access = it }, label = { Text("Access Key ID") }, singleLine = true)
+                                OutlinedTextField(secret, { secret = it }, label = { Text("Secret Access Key") }, singleLine = true)
+                                OutlinedTextField(ssid, { ssid = it }, label = { Text("指定 WiFi 名称（可选）") }, singleLine = true)
+                                if (connectionTest.isNotBlank()) Text(connectionTest, color = if (connectionTest.startsWith("连接成功")) Color(0xFF16865C) else Blue, fontSize = 12.sp)
+                            }
+                            1 -> {
+                                Text("修改管理员密码", color = Ink, fontWeight = FontWeight.Bold)
+                                OutlinedTextField(adminNewPassword, { adminNewPassword = it }, label = { Text("新密码（至少 6 位）") }, singleLine = true)
+                                OutlinedTextField(adminConfirmPassword, { adminConfirmPassword = it }, label = { Text("确认新密码") }, singleLine = true)
+                                Button(enabled = !busy && adminNewPassword.length >= 6 && adminNewPassword == adminConfirmPassword, onClick = {
+                                    scope.launch {
+                                        busy = true
+                                        try {
+                                            val store = R2Store(R2Config(account,bucket,access,secret,ssid))
+                                            withContext(Dispatchers.IO) { val list = store.readEmployees(); store.writeEmployees(list.map { if (it.employeeId == employeeId) R2Store.createEmployee(it.employeeId,it.displayName,it.role,adminNewPassword,false,it.enabled) else it }) }
+                                            adminNewPassword = ""; adminConfirmPassword = ""; message = "管理员密码已更新"
+                                        } catch (e: Exception) { message = "修改失败：" + (e.message ?: "请检查 R2 权限") }
+                                        finally { busy = false }
+                                    }
+                                }) { Text(if (busy) "保存中…" else "保存新密码") }
+                            }
+                            2 -> {
+                                Text("创建员工账号", color = Ink, fontWeight = FontWeight.Bold)
+                                OutlinedTextField(createId, { createId = it.filter(Char::isDigit).take(6) }, label = { Text("六位工号") }, singleLine = true)
+                                OutlinedTextField(createName, { createName = it }, label = { Text("员工姓名") }, singleLine = true)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilterChip(selected = createRole == "employee", onClick = { createRole = "employee" }, label = { Text("普通员工") })
+                                    FilterChip(selected = createRole == "admin", onClick = { createRole = "admin" }, label = { Text("管理员") })
+                                }
+                                Text("初始密码为六位工号，首次登录需要修改。", color = Muted, fontSize = 12.sp)
+                                Button(enabled = !busy && createId.length == 6 && createName.isNotBlank(), onClick = {
+                                    scope.launch {
+                                        busy = true
+                                        try {
+                                            val store = R2Store(R2Config(account,bucket,access,secret,ssid))
+                                            withContext(Dispatchers.IO) { val list = store.readEmployees(); require(list.none { it.employeeId == createId }) { "该工号已存在" }; store.writeEmployees(list + R2Store.createEmployee(createId,createName.trim(),createRole,createId,true,true)) }
+                                            message = "账号创建成功，初始密码为工号"; createId = ""; createName = ""
+                                        } catch (e: Exception) { message = "创建失败：" + (e.message ?: "请检查 R2 写权限") }
+                                        finally { busy = false }
+                                    }
+                                }) { Text(if (busy) "正在创建…" else "创建并分配账号") }
+                                if (message.isNotBlank()) Text(message, color = Blue, fontSize = 12.sp)
+                            }
+                        }
                     }
                 },
                 confirmButton = { Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") } },
