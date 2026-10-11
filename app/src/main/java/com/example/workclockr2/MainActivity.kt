@@ -73,6 +73,7 @@ fun WorkClockApp(context: Context) {
     var loginId by remember { mutableStateOf("") }
     var loginPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var needChangePassword by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val configured = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()
@@ -171,10 +172,27 @@ fun WorkClockApp(context: Context) {
                 }
             } else if (needChangePassword) {
                 Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center) {
-                    Text("需要修改初始密码", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Text("为避免默认密码带来的风险，请联系管理员修改 R2 中 employees.json 的 passwordSalt、passwordHash 和 mustChangePassword。", color = Muted)
+                    Text("设置新密码", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Ink)
+                    Text("首次登录请修改密码。", color = Muted)
                     Spacer(Modifier.height(16.dp))
-                    Button(onClick = { loggedIn = false; prefs.edit().putBoolean("loggedIn", false).apply() }, modifier = Modifier.fillMaxWidth()) { Text("退出登录") }
+                    OutlinedTextField(newPassword, { newPassword = it }, label = { Text("新密码（至少 6 位）") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(confirmPassword, { confirmPassword = it }, label = { Text("确认新密码") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    Button(enabled = !busy && newPassword.length >= 6 && newPassword == confirmPassword, onClick = {
+                        scope.launch {
+                            busy = true
+                            try {
+                                val store = R2Store(R2Config(account,bucket,access,secret,ssid))
+                                withContext(Dispatchers.IO) {
+                                    val list = store.readEmployees()
+                                    store.writeEmployees(list.map { if (it.employeeId == employeeId) R2Store.createEmployee(it.employeeId,it.displayName,it.role,newPassword,false,it.enabled) else it })
+                                }
+                                needChangePassword = false; newPassword = ""; confirmPassword = ""; message = "密码已更新"
+                            } catch (e: Exception) { message = "修改失败：" + (e.message ?: "请检查 R2 权限") }
+                            finally { busy = false }
+                        }
+                    }, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "保存中…" else "保存新密码") }
+                    if (message.isNotBlank()) Text(message, color = Blue)
+                    TextButton(onClick = { loggedIn = false; prefs.edit().putBoolean("loggedIn", false).apply() }) { Text("退出登录") }
                 }
             } else {
                 LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
