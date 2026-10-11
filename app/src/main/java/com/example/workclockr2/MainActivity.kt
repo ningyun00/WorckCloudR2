@@ -151,7 +151,8 @@ fun WorkClockApp(context: Context) {
                         scope.launch {
                             busy = true
                             try {
-                                val emp = R2Store(R2Config(account,bucket,access,secret,ssid)).readEmployees()
+                                val store = R2Store(R2Config(account,bucket,access,secret,ssid))
+                                val emp = withContext(Dispatchers.IO) { store.readEmployees() }
                                     .firstOrNull { it.employeeId == loginId && it.enabled }
                                 if (emp == null) message = "工号不存在或已停用"
                                 else if (!R2Store.verifyPassword(emp, loginPassword)) message = "密码错误"
@@ -159,7 +160,7 @@ fun WorkClockApp(context: Context) {
                                     employeeId = emp.employeeId; employeeName = emp.displayName; role = emp.role
                                     loggedIn = true; needChangePassword = emp.mustChangePassword
                                     prefs.edit().putString("employee", employeeId).putString("name", employeeName).putString("role", role).putBoolean("loggedIn", true).apply()
-                                    punchList = R2Store(R2Config(account,bucket,access,secret,ssid)).readPunches(monthKey).filter { it.employeeId == employeeId }
+                                    punchList = withContext(Dispatchers.IO) { store.readPunches(monthKey) }.filter { it.employeeId == employeeId }
                                     message = if (needChangePassword) "当前为初始密码，请联系管理员更新 employees.json 中的密码配置。" else "登录成功"
                                 }
                             } catch (e: Exception) { message = "登录失败：${e.message ?: "请检查 R2 文件"}" }
