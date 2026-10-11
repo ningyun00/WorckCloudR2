@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
 fun WorkClockApp(context: Context) {
     val prefs = remember { context.getSharedPreferences("workclock", Context.MODE_PRIVATE) }
     var account by remember { mutableStateOf(prefs.getString("account", "") ?: "") }
-    var bucket by remember { mutableStateOf(prefs.getString("bucket", "") ?: "") }
+    val bucket = "workcloudr2"
     var access by remember { mutableStateOf(prefs.getString("access", "") ?: "") }
     var secret by remember { mutableStateOf(prefs.getString("secret", "") ?: "") }
     var ssid by remember { mutableStateOf(prefs.getString("ssid", "") ?: "") }
@@ -65,14 +65,14 @@ fun WorkClockApp(context: Context) {
     var punchList by remember { mutableStateOf(listOf<Punch>()) }
     var selectedDay by remember { mutableStateOf(LocalDate.now()) }
     var status by remember { mutableStateOf("尚未打卡") }
-    var message by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("") }\n    var connectionTest by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var loginId by remember { mutableStateOf("") }
     var loginPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var needChangePassword by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val configured = account.isNotBlank() && bucket.isNotBlank() && access.isNotBlank() && secret.isNotBlank()
+    val configured = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()
     val today = LocalDate.now()
     val fmt = DateTimeFormatter.ofPattern("HH:mm:ss")
     val dayPunches = punchList.filter { it.day == selectedDay.toString() }.sortedBy { it.at }
@@ -81,7 +81,7 @@ fun WorkClockApp(context: Context) {
     val hours = calculateHours(dayPunches)
 
     fun saveConfig() {
-        prefs.edit().putString("account", account.trim()).putString("bucket", bucket.trim())
+        prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2")
             .putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).apply()
         showSettings = false
         message = "配置已保存。请先在 R2 上传 employees.json，然后登录。"
@@ -262,16 +262,16 @@ fun WorkClockApp(context: Context) {
             AlertDialog(onDismissRequest = { if (configured) showSettings = false }, title = { Text("Cloudflare R2 配置") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("请填写 R2 S3 API 凭据。密钥仅保存在本机应用偏好设置中，但仍可被有设备访问权限的人提取。", color = Muted, fontSize = 12.sp)
+                        Text("请填写 R2 S3 API 凭据。桶已固定为 workcloudr2。测试连接会读取 employees.json，并区分常见错误。密钥保存在本机，但仍可能被提取。", color = Muted, fontSize = 12.sp)
                         OutlinedTextField(account, { account = it }, label = { Text("Account ID") }, singleLine = true)
-                        OutlinedTextField(bucket, { bucket = it }, label = { Text("Bucket 名称") }, singleLine = true)
+                        Text("存储桶：workcloudr2（已固定，无需选择）", color = Ink, fontWeight = FontWeight.Medium)
                         OutlinedTextField(access, { access = it }, label = { Text("Access Key ID") }, singleLine = true)
                         OutlinedTextField(secret, { secret = it }, label = { Text("Secret Access Key") }, singleLine = true)
-                        OutlinedTextField(ssid, { ssid = it }, label = { Text("指定 WiFi 名称（可选）") }, singleLine = true)
+                        OutlinedTextField(ssid, { ssid = it }, label = { Text("指定 WiFi 名称（可选）") }, singleLine = true)\n                        if (connectionTest.isNotBlank()) Text(connectionTest, color = if (connectionTest.startsWith("连接成功")) Color(0xFF16865C) else Blue, fontSize = 12.sp)
                     }
                 },
-                confirmButton = { Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && bucket.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") } },
-                dismissButton = { if (configured) TextButton(onClick = { showSettings = false }) { Text("取消") } })
+                confirmButton = { Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") } },
+                dismissButton = {\n                    Row {\n                        TextButton(enabled = !busy && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {\n                            scope.launch {\n                                busy = true; connectionTest = "正在测试连接…"\n                                try { connectionTest = R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid)).testConnection() }\n                                catch (e: Exception) { connectionTest = "测试异常：${e.message ?: e.javaClass.simpleName}" }\n                                finally { busy = false }\n                            }\n                        }) { Text("测试连接") }\n                        if (configured) TextButton(onClick = { showSettings = false }) { Text("取消") }\n                    }\n                })
         }
     }
 }
