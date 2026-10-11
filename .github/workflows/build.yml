@@ -17,7 +17,6 @@ jobs:
       - uses: android-actions/setup-android@v3
       - name: Build debug APK
         run: |
-          gradle wrapper --gradle-version 8.9
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
