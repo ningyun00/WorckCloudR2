@@ -336,7 +336,7 @@ fun WorkClockApp(context: Context) {
                                     FilterChip(selected = createRole == "admin", onClick = { createRole = "admin" }, label = { Text("管理员") })
                                 }
                                 Text("初始密码为六位工号，首次登录需要修改。", color = Muted, fontSize = 12.sp)
-                                Button(enabled = !creatingEmployee && !busy && createId.length == 6 && createName.isNotBlank(), onClick = {
+                                Button(enabled = !creatingEmployee && createId.length == 6 && createName.isNotBlank(), onClick = {
                                     scope.launch {
                                         creatingEmployee = true
                                         try {
