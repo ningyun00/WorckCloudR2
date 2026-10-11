@@ -12,6 +12,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -167,7 +169,7 @@ fun WorkClockApp(context: Context) {
                                     employeeId = emp.employeeId; employeeName = emp.displayName; role = emp.role
                                     loggedIn = true; needChangePassword = emp.mustChangePassword
                                     prefs.edit().putString("employee", employeeId).putString("name", employeeName).putString("role", role).putBoolean("loggedIn", true).apply()
-                                    punchList = withContext(Dispatchers.IO) { store.readPunches(monthKey) }.filter { it.employeeId == employeeId }
+                                    punchList = runCatching { withContext(Dispatchers.IO) { store.readPunches(monthKey) }.filter { it.employeeId == employeeId } }.getOrDefault(emptyList())
                                     message = if (needChangePassword) "当前为初始密码，请联系管理员更新 employees.json 中的密码配置。" else "登录成功"
                                 }
                             } catch (e: Exception) { message = "登录失败：${e.message ?: "请检查 R2 文件"}" }
@@ -289,7 +291,7 @@ fun WorkClockApp(context: Context) {
         if (showSettings) {
             AlertDialog(onDismissRequest = { if (configured) showSettings = false }, title = { Text(if (role == "admin") "管理设置" else "Cloudflare R2 配置") },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (role == "admin") {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                                 listOf("R2 配置", "修改密码", "分配新用户").forEachIndexed { index, label ->
@@ -348,7 +350,7 @@ fun WorkClockApp(context: Context) {
                         }
                     }
                 },
-                confirmButton = { Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") } },
+                confirmButton = { if (settingsPage == 0 || role != "admin") Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") } else TextButton(onClick = { showSettings = false }) { Text("完成") } },
                 dismissButton = {
                     Row {
                         TextButton(enabled = !busy && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {
