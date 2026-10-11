@@ -24,7 +24,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -278,7 +280,7 @@ fun WorkClockApp(context: Context) {
                         TextButton(enabled = !busy && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {
                             scope.launch {
                                 busy = true; connectionTest = "正在测试连接…"
-                                try { connectionTest = R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid)).testConnection() }
+                                try { connectionTest = withContext(Dispatchers.IO) { R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid)).testConnection() } }
                                 catch (e: Exception) { connectionTest = "测试异常：${e.message ?: e.javaClass.simpleName}" }
                                 finally { busy = false }
                             }
