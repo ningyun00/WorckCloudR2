@@ -1,0 +1,13 @@
+{
+  "employees": [
+    {
+      "employeeId": "000001",
+      "displayName": "请替换为管理员姓名",
+      "role": "admin",
+      "passwordSalt": "请替换为Base64随机盐",
+      "passwordHash": "请替换为Base64 SHA-256(salt+password)",
+      "mustChangePassword": true,
+      "enabled": true
+    }
+  ]
+}
