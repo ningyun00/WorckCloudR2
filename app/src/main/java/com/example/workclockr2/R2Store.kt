@@ -63,13 +63,18 @@ class R2Store(private val config: R2Config) {
     }
 
     fun writeEmployees(employees: List<Employee>) {
-        writeText("employees.json", gson.toJson(mapOf("employees" to employees)))
+        // Keep the administrator/root accounts in employees and store child accounts in ListUsers.
+        val rootUsers = employees.filter { it.role.equals("admin", ignoreCase = true) }
+        val childUsers = employees.filterNot { it.role.equals("admin", ignoreCase = true) }
+        writeText("employees.json", gson.toJson(mapOf("employees" to rootUsers, "ListUsers" to childUsers)))
     }
 
     fun readEmployees(): List<Employee> {
         val raw = readText("employees.json") ?: throw IllegalStateException("R2 中未找到 employees.json")
         val envelope: EmployeeEnvelope = gson.fromJson(raw, EmployeeEnvelope::class.java)
-        return envelope.employees ?: emptyList()
+        // Backward compatible: older files may have all accounts under employees only.
+        return (envelope.employees.orEmpty() + envelope.ListUsers.orEmpty())
+            .distinctBy { it.employeeId }
     }
 
     fun readPunches(month: String): List<Punch> {
@@ -104,4 +109,4 @@ class R2Store(private val config: R2Config) {
     }
 }
 
-private data class EmployeeEnvelope(val employees: List<Employee>?)
+private data class EmployeeEnvelope(val employees: List<Employee>?, val ListUsers: List<Employee>?)
