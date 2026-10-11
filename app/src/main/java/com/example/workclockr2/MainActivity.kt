@@ -65,7 +65,8 @@ fun WorkClockApp(context: Context) {
     var punchList by remember { mutableStateOf(listOf<Punch>()) }
     var selectedDay by remember { mutableStateOf(LocalDate.now()) }
     var status by remember { mutableStateOf("尚未打卡") }
-    var message by remember { mutableStateOf("") }\n    var connectionTest by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("") }
+    var connectionTest by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var loginId by remember { mutableStateOf("") }
     var loginPassword by remember { mutableStateOf("") }
@@ -267,11 +268,24 @@ fun WorkClockApp(context: Context) {
                         Text("存储桶：workcloudr2（已固定，无需选择）", color = Ink, fontWeight = FontWeight.Medium)
                         OutlinedTextField(access, { access = it }, label = { Text("Access Key ID") }, singleLine = true)
                         OutlinedTextField(secret, { secret = it }, label = { Text("Secret Access Key") }, singleLine = true)
-                        OutlinedTextField(ssid, { ssid = it }, label = { Text("指定 WiFi 名称（可选）") }, singleLine = true)\n                        if (connectionTest.isNotBlank()) Text(connectionTest, color = if (connectionTest.startsWith("连接成功")) Color(0xFF16865C) else Blue, fontSize = 12.sp)
+                        OutlinedTextField(ssid, { ssid = it }, label = { Text("指定 WiFi 名称（可选）") }, singleLine = true)
+                        if (connectionTest.isNotBlank()) Text(connectionTest, color = if (connectionTest.startsWith("连接成功")) Color(0xFF16865C) else Blue, fontSize = 12.sp)
                     }
                 },
                 confirmButton = { Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") } },
-                dismissButton = {\n                    Row {\n                        TextButton(enabled = !busy && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {\n                            scope.launch {\n                                busy = true; connectionTest = "正在测试连接…"\n                                try { connectionTest = R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid)).testConnection() }\n                                catch (e: Exception) { connectionTest = "测试异常：${e.message ?: e.javaClass.simpleName}" }\n                                finally { busy = false }\n                            }\n                        }) { Text("测试连接") }\n                        if (configured) TextButton(onClick = { showSettings = false }) { Text("取消") }\n                    }\n                })
+                dismissButton = {
+                    Row {
+                        TextButton(enabled = !busy && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {
+                            scope.launch {
+                                busy = true; connectionTest = "正在测试连接…"
+                                try { connectionTest = R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid)).testConnection() }
+                                catch (e: Exception) { connectionTest = "测试异常：${e.message ?: e.javaClass.simpleName}" }
+                                finally { busy = false }
+                            }
+                        }) { Text("测试连接") }
+                        if (configured) TextButton(onClick = { showSettings = false }) { Text("取消") }
+                    }
+                })
         }
     }
 }
