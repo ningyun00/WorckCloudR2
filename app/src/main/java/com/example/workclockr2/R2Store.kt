@@ -13,6 +13,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.core.sync.RequestBody
 import java.net.URI
 import java.security.MessageDigest
+import java.security.SecureRandom
 
 class R2Store(private val config: R2Config) {
     private val gson = Gson()
@@ -61,6 +62,10 @@ class R2Store(private val config: R2Config) {
         }
     }
 
+    fun writeEmployees(employees: List<Employee>) {
+        writeText("employees.json", gson.toJson(mapOf("employees" to employees)))
+    }
+
     fun readEmployees(): List<Employee> {
         val raw = readText("employees.json") ?: throw IllegalStateException("R2 中未找到 employees.json")
         val envelope: EmployeeEnvelope = gson.fromJson(raw, EmployeeEnvelope::class.java)
@@ -80,6 +85,14 @@ class R2Store(private val config: R2Config) {
     }
 
     companion object {
+        fun createEmployee(employeeId: String, displayName: String, role: String, password: String, mustChangePassword: Boolean = true, enabled: Boolean = true): Employee {
+            val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+            val digest = MessageDigest.getInstance("SHA-256")
+            digest.update(salt)
+            val hash = digest.digest(password.toByteArray(Charsets.UTF_8))
+            return Employee(employeeId, displayName, role, Base64.encodeToString(salt, Base64.NO_WRAP), Base64.encodeToString(hash, Base64.NO_WRAP), mustChangePassword, enabled)
+        }
+
         fun verifyPassword(employee: Employee, password: String): Boolean {
             val salt = runCatching { Base64.decode(employee.passwordSalt, Base64.DEFAULT) }.getOrNull() ?: return false
             val expected = runCatching { Base64.decode(employee.passwordHash, Base64.DEFAULT) }.getOrNull() ?: return false
