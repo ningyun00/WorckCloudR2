@@ -335,14 +335,15 @@ fun WorkClockApp(context: Context) {
                                     FilterChip(selected = createRole == "employee", onClick = { createRole = "employee" }, label = { Text("普通员工") })
                                     FilterChip(selected = createRole == "admin", onClick = { createRole = "admin" }, label = { Text("管理员") })
                                 }
-                                Text("初始密码为六位工号，首次登录需要修改。", color = Muted, fontSize = 12.sp)
-                                Button(enabled = !creatingEmployee && createId.length == 6 && createName.isNotBlank(), onClick = {
+                                Text("可输入 1–6 位数字，系统自动补足六位；初始密码为六位工号，首次登录需要修改。", color = Muted, fontSize = 12.sp)
+                                Button(enabled = !creatingEmployee && createId.length in 1..6 && createId.all { it.isDigit() } && createName.isNotBlank(), onClick = {
                                     scope.launch {
                                         creatingEmployee = true
                                         try {
+                                            val normalizedId = createId.trim().padStart(6, '0')
                                             val store = R2Store(R2Config(account,bucket,access,secret,ssid))
-                                            withContext(Dispatchers.IO) { val list = store.readEmployees(); require(list.none { it.employeeId == createId }) { "该工号已存在" }; store.writeEmployees(list + R2Store.createEmployee(createId,createName.trim(),createRole,createId,true,true)) }
-                                            message = "账号创建成功，初始密码为工号"; createId = ""; createName = ""
+                                            withContext(Dispatchers.IO) { val list = store.readEmployees(); require(list.none { it.employeeId == normalizedId }) { "该工号已存在" }; store.writeEmployees(list + R2Store.createEmployee(normalizedId,createName.trim(),createRole,normalizedId,true,true)) }
+                                            message = "账号创建成功，工号：${createId.trim().padStart(6, '0')}，初始密码为该六位工号"; createId = ""; createName = ""
                                         } catch (e: Exception) { message = "创建失败：" + (e.message ?: "请检查 R2 写权限") }
                                         finally { creatingEmployee = false }
                                     }
