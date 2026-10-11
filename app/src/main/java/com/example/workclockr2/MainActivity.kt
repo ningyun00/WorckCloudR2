@@ -289,17 +289,17 @@ fun WorkClockApp(context: Context) {
             }
         }
         if (showSettings) {
-            AlertDialog(onDismissRequest = { if (configured) showSettings = false }, title = { Text(if (role == "admin") "管理设置" else "Cloudflare R2 配置") },
+            AlertDialog(onDismissRequest = { if (configured) showSettings = false }, title = { Text(if (role == "admin" && loggedIn) "管理设置" else "Cloudflare R2 配置") },
                 text = {
                     Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (role == "admin") {
+                        if (role == "admin" && loggedIn) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                                 listOf("R2 配置", "修改密码", "分配新用户").forEachIndexed { index, label ->
                                     TextButton(onClick = { settingsPage = index }) { Text(if (settingsPage == index) "● " + label else label) }
                                 }
                             }
                         }
-                        when (if (role == "admin") settingsPage else 0) {
+                        when (if (role == "admin" && loggedIn) settingsPage else 0) {
                             0 -> {
                                 Text("R2 S3 API 凭据。桶固定为 workcloudr2。", color = Muted, fontSize = 12.sp)
                                 OutlinedTextField(account, { account = it }, label = { Text("Account ID") }, singleLine = true)
@@ -350,7 +350,7 @@ fun WorkClockApp(context: Context) {
                         }
                     }
                 },
-                confirmButton = { if (settingsPage == 0 || role != "admin") Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") } else TextButton(onClick = { showSettings = false }) { Text("完成") } },
+                confirmButton = { if (settingsPage == 0 || role != "admin" || !loggedIn) Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") } else TextButton(onClick = { showSettings = false }) { Text("完成") } },
                 dismissButton = {
                     Row {
                         TextButton(enabled = !busy && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {
