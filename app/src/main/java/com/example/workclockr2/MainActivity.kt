@@ -355,7 +355,7 @@ fun WorkClockApp(context: Context) {
                 confirmButton = { if (settingsPage == 0 || role != "admin" || !loggedIn) Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") } else TextButton(onClick = { showSettings = false }) { Text("完成") } },
                 dismissButton = {
                     Row {
-                        TextButton(enabled = !testingConnection && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {
+                        if (settingsPage == 0 || role != "admin" || !loggedIn) TextButton(enabled = !testingConnection && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {
                             scope.launch {
                                 testingConnection = true; connectionTest = "正在测试连接…"
                                 try { connectionTest = withContext(Dispatchers.IO) { R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid)).testConnection() } }
