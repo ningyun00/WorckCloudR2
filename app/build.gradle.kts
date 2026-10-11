@@ -21,7 +21,7 @@ android {
     kotlinOptions { jvmTarget = "17" }
     packaging {
         resources {
-            excludes += setOf("META-INF/INDEX.LIST", "META-INF/DEPENDENCIES")
+            excludes += setOf("META-INF/INDEX.LIST", "META-INF/DEPENDENCIES", "META-INF/io.netty.versions.properties")
         }
     }
 }
