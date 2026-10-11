@@ -39,7 +39,29 @@ class R2Store(private val config: R2Config) {
         )
     }
 
-    fun testConnection(): String {\n        return try {\n            readEmployees()\n            "连接成功：已读取 employees.json，桶名、凭据和读权限均正常。"\n        } catch (e: Exception) {\n            val service = e as? software.amazon.awssdk.services.s3.model.S3Exception\n            when (service?.statusCode()) {\n                401, 403 -> "鉴权失败（HTTP ${service.statusCode()}）：请核对 Access Key/Secret，以及该凭据对 workcloudr2 桶的读权限。"\n                404 -> "对象或存储桶不存在（HTTP 404）：请确认桶名为 workcloudr2，且已上传 employees.json。"\n                else -> {\n                    val msg = e.message.orEmpty()\n                    when {\n                        e is java.net.UnknownHostException || msg.contains("UnknownHost", true) -> "网络/DNS 错误：无法解析 R2 地址，请检查 Account ID 和网络。"\n                        msg.contains("timed out", true) || msg.contains("timeout", true) -> "连接超时：请检查网络是否能访问 Cloudflare R2。"\n                        msg.contains("employees.json", true) -> "R2 已响应，但未能读取 employees.json：请检查对象路径及读权限。"\n                        else -> "连接失败：${service?.statusCode()?.let { "HTTP $it；" } ?: ""}${msg.take(220).ifBlank { e.javaClass.simpleName }}"\n                    }\n                }\n            }\n        }\n    }\n\n    fun readEmployees(): List<Employee> {
+    fun testConnection(): String {
+        return try {
+            readEmployees()
+            "连接成功：已读取 employees.json，桶名、凭据和读权限均正常。"
+        } catch (e: Exception) {
+            val service = e as? software.amazon.awssdk.services.s3.model.S3Exception
+            when (service?.statusCode()) {
+                401, 403 -> "鉴权失败（HTTP ${service.statusCode()}）：请核对 Access Key/Secret，以及该凭据对 workcloudr2 桶的读权限。"
+                404 -> "对象或存储桶不存在（HTTP 404）：请确认桶名为 workcloudr2，且已上传 employees.json。"
+                else -> {
+                    val msg = e.message.orEmpty()
+                    when {
+                        e is java.net.UnknownHostException || msg.contains("UnknownHost", true) -> "网络/DNS 错误：无法解析 R2 地址，请检查 Account ID 和网络。"
+                        msg.contains("timed out", true) || msg.contains("timeout", true) -> "连接超时：请检查网络是否能访问 Cloudflare R2。"
+                        msg.contains("employees.json", true) -> "R2 已响应，但未能读取 employees.json：请检查对象路径及读权限。"
+                        else -> "连接失败：${service?.statusCode()?.let { "HTTP $it；" } ?: ""}${msg.take(220).ifBlank { e.javaClass.simpleName }}"
+                    }
+                }
+            }
+        }
+    }
+
+    fun readEmployees(): List<Employee> {
         val raw = readText("employees.json") ?: throw IllegalStateException("R2 中未找到 employees.json")
         val envelope: EmployeeEnvelope = gson.fromJson(raw, EmployeeEnvelope::class.java)
         return envelope.employees ?: emptyList()
