@@ -32,4 +32,5 @@ dependencies {
     implementation("software.amazon.awssdk:s3:2.29.26")
     implementation("software.amazon.awssdk:auth:2.29.26")
     implementation("software.amazon.awssdk:regions:2.29.26")
+    implementation("software.amazon.awssdk:url-connection-client:2.29.26")
 }
