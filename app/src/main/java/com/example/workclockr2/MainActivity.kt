@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.Lifecycle
@@ -108,6 +109,32 @@ fun WorkClockApp(context: Context) {
     var selectedSummaryEmployee by remember { mutableStateOf<Employee?>(null) }
     var selectedSummaryDay by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val canNavigateBack = showAdminConfigAuth || showSettings || needChangePassword ||
+        (role == "admin" && (selectedSummaryDay != null || selectedSummaryEmployee != null || showAdminSummary))
+    BackHandler(enabled = canNavigateBack) {
+        when {
+            showAdminConfigAuth -> {
+                showAdminConfigAuth = false
+                adminConfigPassword = ""
+                configAuthMessage = ""
+            }
+            showSettings -> {
+                showSettings = false
+                configUnlocked = false
+            }
+            needChangePassword -> {
+                needChangePassword = false
+                newPassword = ""
+                confirmPassword = ""
+            }
+            role == "admin" && selectedSummaryDay != null -> selectedSummaryDay = null
+            role == "admin" && selectedSummaryEmployee != null -> {
+                selectedSummaryEmployee = null
+                selectedSummaryDay = null
+            }
+            role == "admin" && showAdminSummary -> showAdminSummary = false
+        }
+    }
     val configured = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()
     DisposableEffect(context) {
         val activity = context as? ComponentActivity
