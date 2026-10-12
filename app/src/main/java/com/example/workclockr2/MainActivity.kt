@@ -9,6 +9,8 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -100,9 +102,22 @@ fun WorkClockApp(context: Context) {
     var summaryPunches by remember { mutableStateOf(listOf<Punch>()) }
     var summaryError by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    DisposableEffect(context) {
+        val activity = context as? ComponentActivity
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                configUnlocked = false
+                showAdminConfigAuth = false
+                adminConfigPassword = ""
+                configAuthMessage = ""
+            }
+        }
+        activity?.lifecycle?.addObserver(observer)
+        onDispose { activity?.lifecycle?.removeObserver(observer) }
+    }
     val configured = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()
     val restrictedUserSettings = configured && loggedIn && role != "admin"
-    val hideR2Credentials = configured && !configUnlocked && !(role == "admin" && loggedIn)
+    val hideR2Credentials = configured && !configUnlocked
     val today = LocalDate.now()
     val fmt = DateTimeFormatter.ofPattern("HH:mm:ss")
     val dayPunches = punchList.filter { it.day == selectedDay.toString() }.sortedByDescending { it.at }
@@ -175,7 +190,7 @@ fun WorkClockApp(context: Context) {
                     Text(if (loggedIn) "$employeeName · $employeeId" else "考勤工作台", fontSize = 12.sp, color = Muted)
                 }
             }, actions = {
-                IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.Settings, "设置") }
+                IconButton(onClick = { if (role == "admin" && loggedIn) { configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = ""; configAuthMessage = "" }; showSettings = true }) { Icon(Icons.Default.Settings, "设置") }
             }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF4F7FC)))
         }) { padding ->
             if (!configured) {
@@ -424,13 +439,13 @@ fun WorkClockApp(context: Context) {
             }
         }
         if (showSettings) {
-            AlertDialog(onDismissRequest = { if (configured) showSettings = false }, title = { Text(if (role == "admin" && loggedIn) "管理设置" else "Cloudflare R2 配置") },
+            AlertDialog(onDismissRequest = { if (configured) { showSettings = false; configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = "" } }, title = { Text(if (role == "admin" && loggedIn) "管理设置" else "Cloudflare R2 配置") },
                 text = {
                     Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (role == "admin" && loggedIn) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                                 listOf("R2 配置", "修改密码", "分配新用户").forEachIndexed { index, label ->
-                                    TextButton(onClick = { settingsPage = index }) { Text(if (settingsPage == index) "● " + label else label) }
+                                    TextButton(onClick = { if (index != 0) { configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = "" }; settingsPage = index }) { Text(if (settingsPage == index) "● " + label else label) }
                                 }
                             }
                         }
@@ -507,7 +522,7 @@ fun WorkClockApp(context: Context) {
                     if (restrictedUserSettings || hideR2Credentials) {
                         TextButton(onClick = { showSettings = false }) { Text("完成") }
                     } else if (settingsPage == 0 || role != "admin" || !loggedIn) {
-                        Button(onClick = { saveConfig(); configUnlocked = false }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") }
+                        Button(onClick = { saveConfig(); configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = "" }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") }
                     } else {
                         TextButton(onClick = { showSettings = false }) { Text("完成") }
                     }
@@ -522,13 +537,13 @@ fun WorkClockApp(context: Context) {
                                 finally { testingConnection = false }
                             }
                         }) { Text(if (testingConnection) "正在测试…" else "测试连接") }
-                        if (configured) TextButton(onClick = { showSettings = false }) { Text("取消") }
+                        if (configured) TextButton(onClick = { showSettings = false; configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = ""; configAuthMessage = "" }) { Text("取消") }
                     }
                 })
         }
         if (showAdminConfigAuth) {
             AlertDialog(
-                onDismissRequest = { showAdminConfigAuth = false },
+                onDismissRequest = { showAdminConfigAuth = false; configUnlocked = false; adminConfigPassword = ""; configAuthMessage = "" },
                 title = { Text("管理员验证") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -562,7 +577,7 @@ fun WorkClockApp(context: Context) {
                         }
                     }) { Text(if (busy) "验证中…" else "验证并查看") }
                 },
-                dismissButton = { TextButton(onClick = { showAdminConfigAuth = false }) { Text("取消") } }
+                dismissButton = { TextButton(onClick = { showAdminConfigAuth = false; configUnlocked = false; adminConfigPassword = ""; configAuthMessage = "" }) { Text("取消") } }
             )
         }
     }
