@@ -11,7 +11,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "0.1.1"
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -38,4 +38,8 @@ dependencies {
     implementation("software.amazon.awssdk:auth:2.29.26")
     implementation("software.amazon.awssdk:regions:2.29.26")
     implementation("software.amazon.awssdk:url-connection-client:2.29.26")
+
+    // Android does not provide the StAX API required by the AWS SDK's XML response parser.
+    implementation("javax.xml.stream:stax-api:1.0-2")
+    implementation("com.fasterxml.woodstox:woodstox-core:6.6.2")
 }
