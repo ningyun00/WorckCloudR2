@@ -23,6 +23,8 @@ class R2Store(private val config: R2Config) {
     suspend fun readPunchesAsync(month: String): List<Punch> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readPunches(month) }
     suspend fun writePunchesAsync(month: String, punches: List<Punch>) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writePunches(month, punches) }
     suspend fun writeEmployeesAsync(employees: List<Employee>) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writeEmployees(employees) }
+    suspend fun readAllowedSsidAsync(): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readAllowedSsid() }
+    suspend fun writeAllowedSsidAsync(ssid: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writeAllowedSsid(ssid) }
     suspend fun updatePunchesAndVerifyAsync(month: String, punch: Punch): List<Punch> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val existing = readPunches(month)
         val merged = existing.filterNot { it.id == punch.id } + punch
@@ -85,6 +87,18 @@ class R2Store(private val config: R2Config) {
         }
     }
 
+    // Shared attendance Wi-Fi configuration lives in R2 so every device uses the administrator's setting.
+    fun readAllowedSsid(): String {
+        val raw = readText("app-config.json") ?: return ""
+        return runCatching { gson.fromJson(raw, AttendanceAppConfig::class.java)?.allowedSsid.orEmpty() }
+            .getOrElse { throw IllegalStateException("读取 app-config.json 失败：" + (it.message ?: "JSON 格式错误"), it) }
+    }
+
+    fun writeAllowedSsid(ssid: String) {
+        writeText("app-config.json", gson.toJson(AttendanceAppConfig(ssid.trim())))
+        check(readAllowedSsid() == ssid.trim()) { "指定 Wi-Fi 配置已写入，但回读验证不一致" }
+    }
+
     fun writeEmployees(employees: List<Employee>) {
         // Keep the administrator/root accounts in employees and store child accounts in ListUsers.
         val rootUsers = employees.filter { it.role.equals("admin", ignoreCase = true) }
@@ -143,3 +157,5 @@ class R2Store(private val config: R2Config) {
 }
 
 private data class EmployeeEnvelope(val employees: List<Employee>?, val ListUsers: List<Employee>?)
+
+private data class AttendanceAppConfig(val allowedSsid: String)
