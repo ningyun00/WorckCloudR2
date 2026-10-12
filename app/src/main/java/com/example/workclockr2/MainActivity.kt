@@ -111,10 +111,18 @@ fun WorkClockApp(context: Context) {
         if (!loggedIn) { message = "请先登录"; return }
         if (ssid.isNotBlank()) {
             val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            if (!wm.isWifiEnabled) {
+                message = "Wi-Fi 验证失败：手机 Wi-Fi 未开启，请连接指定 Wi-Fi 后重试。"; return
+            }
             @Suppress("DEPRECATION")
-            val current = wm.connectionInfo?.ssid?.trim('"')
-            if (current.isNullOrBlank() || current == "<unknown ssid>" || current != ssid.trim()) {
-                message = "当前 WiFi 不符合要求，已禁止打卡"; return
+            val current = runCatching { wm.connectionInfo?.ssid?.trim('"') }.getOrNull()
+            when {
+                current.isNullOrBlank() || current == "<unknown ssid>" -> {
+                    message = "Wi-Fi 验证失败：Android 未向 App 提供当前 Wi-Fi 名称。请检查 App 的定位/附近 Wi-Fi 权限，并开启手机定位后重试。"; return
+                }
+                current != ssid.trim() -> {
+                    message = "Wi-Fi 名称不匹配：当前读取到“$current”，要求“${ssid.trim()}”。请确认连接了指定 Wi-Fi，名称需完全一致。"; return
+                }
             }
         }
         scope.launch {
