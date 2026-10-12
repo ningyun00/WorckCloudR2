@@ -16,6 +16,23 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 
 class R2Store(private val config: R2Config) {
+    // All network access is exposed through suspend functions that always switch to Dispatchers.IO.
+    // UI code should use these functions instead of calling the synchronous S3 helpers directly.
+    suspend fun testConnectionAsync(): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { testConnection() }
+    suspend fun readEmployeesAsync(): List<Employee> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readEmployees() }
+    suspend fun readPunchesAsync(month: String): List<Punch> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readPunches(month) }
+    suspend fun writePunchesAsync(month: String, punches: List<Punch>) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writePunches(month, punches) }
+    suspend fun writeEmployeesAsync(employees: List<Employee>) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writeEmployees(employees) }
+    suspend fun updatePunchesAndVerifyAsync(month: String, punch: Punch): List<Punch> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val existing = readPunches(month)
+        val merged = existing.filterNot { it.id == punch.id } + punch
+        writePunches(month, merged)
+        val confirmed = readPunches(month)
+        check(confirmed.any { it.id == punch.id }) {
+            "写入请求已发送，但从 R2 重新读取后未找到本次记录"
+        }
+        confirmed
+    }
     private val gson = Gson()
     private val client: S3Client by lazy {
         S3Client.builder()
