@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.gms.mlkit.barcode.GmsBarcodeScanning
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.background
@@ -70,7 +71,9 @@ fun WorkClockApp(context: Context) {
     var access by remember { mutableStateOf(prefs.getString("access", "") ?: "") }
     var secret by remember { mutableStateOf(prefs.getString("secret", "") ?: "") }
     var ssid by remember { mutableStateOf(prefs.getString("ssid", "") ?: "") }
-    var showSettings by remember { mutableStateOf(account.isBlank() || bucket.isBlank() || access.isBlank() || secret.isBlank()) }
+    var showSettings by remember { mutableStateOf(false) }
+    var configMethod by remember { mutableStateOf("选择配置方式") }
+    var qrScanMessage by remember { mutableStateOf("") }
     var employeeId by remember { mutableStateOf(prefs.getString("employee", "") ?: "") }
     var employeeName by remember { mutableStateOf(prefs.getString("name", "") ?: "员工") }
     var role by remember { mutableStateOf(prefs.getString("role", "") ?: "") }
@@ -258,6 +261,25 @@ fun WorkClockApp(context: Context) {
                 message = "本机 R2 配置已保存，但共享 Wi-Fi 写入失败：" + (e.message ?: e.javaClass.simpleName)
             } finally { busy = false }
         }
+    }
+    fun scanR2Qr() {
+        qrScanMessage = "正在打开扫码器…"
+        GmsBarcodeScanning.getClient(context).startScan()
+            .addOnSuccessListener { barcode ->
+                try {
+                    val payload = barcode.rawValue ?: error("二维码没有内容")
+                    val json = com.google.gson.JsonParser.parseString(payload).asJsonObject
+                    account = json.get("account")?.asString ?: json.get("accountId")?.asString ?: ""
+                    access = json.get("access")?.asString ?: json.get("accessKey")?.asString ?: ""
+                    secret = json.get("secret")?.asString ?: json.get("secretKey")?.asString ?: ""
+                    ssid = json.get("ssid")?.asString ?: json.get("allowedSsid")?.asString ?: ""
+                    require(account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { "二维码缺少 account、access 或 secret 字段" }
+                    prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2").putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).commit()
+                    configMethod = "扫码配置"
+                    qrScanMessage = "扫码成功，请点击“保存配置”完成设置。"
+                } catch (e: Exception) { qrScanMessage = "二维码格式不正确：" + (e.message ?: "请使用 R2 配置二维码") }
+            }
+            .addOnFailureListener { e -> qrScanMessage = "扫码取消或失败：" + (e.message ?: "请重试") }
     }
     fun doPunch(type: String) {
         if (!configured) { showSettings = true; message = "请先完成 R2 配置"; return }
@@ -1151,7 +1173,7 @@ fun WorkClockApp(context: Context) {
             )
         }
         if (showSettings) {
-            AlertDialog(onDismissRequest = { if (configured) { showSettings = false; configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = "" } }, title = { Text(if (role == "admin" && loggedIn) "管理设置" else "Cloudflare R2 配置") },
+            AlertDialog(onDismissRequest = { if (configured) { showSettings = false; configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = "" } }, title = { Text(if (role == "admin" && loggedIn) "管理设置" else "设置") },
                 text = {
                     Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (role == "admin" && loggedIn) {
@@ -1163,9 +1185,23 @@ fun WorkClockApp(context: Context) {
                         }
                         when (if (role == "admin" && loggedIn) settingsPage else 0) {
                             0 -> {
+                                if (role != "admin" || !loggedIn) {
+                                    Text("选择 R2 配置方式", color = Ink, fontWeight = FontWeight.Bold)
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        FilterChip(selected = configMethod == "扫码配置", onClick = { configMethod = "扫码配置" }, label = { Text("扫码配置") })
+                                        FilterChip(selected = configMethod == "手动配置", onClick = { configMethod = "手动配置" }, label = { Text("手动配置") })
+                                    }
+                                    if (configMethod == "扫码配置") {
+                                        Text("扫描管理员提供的 R2 配置二维码，内容需包含 account、access、secret，可选 ssid。", color = Muted, fontSize = 12.sp)
+                                        Button(onClick = { scanR2Qr() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.QrCodeScanner, null); Spacer(Modifier.width(8.dp)); Text("开始扫码") }
+                                        if (qrScanMessage.isNotBlank()) Text(qrScanMessage, color = Blue, fontSize = 12.sp)
+                                    }
+                                }
                                 if (restrictedUserSettings) {
                                     Text("存储桶：workcloudr2（固定）", color = Ink, fontWeight = FontWeight.Medium)
                                     Text("R2 配置由管理员统一管理。", color = Muted, fontSize = 12.sp)
+                                } else if ((role != "admin" || !loggedIn) && configMethod != "手动配置") {
+                                    Text("请选择扫码配置或手动配置。", color = Muted, fontSize = 12.sp)
                                 } else if (hideR2Credentials) {
                                     Text("存储桶：workcloudr2（固定）", color = Ink, fontWeight = FontWeight.Medium)
                                     Text("R2 配置已隐藏。需要查看或修改时，请验证管理员密码。", color = Muted, fontSize = 12.sp)
