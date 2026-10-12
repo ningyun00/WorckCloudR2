@@ -105,7 +105,7 @@ fun WorkClockApp(context: Context) {
     val hideR2Credentials = configured && !configUnlocked && !(role == "admin" && loggedIn)
     val today = LocalDate.now()
     val fmt = DateTimeFormatter.ofPattern("HH:mm:ss")
-    val dayPunches = punchList.filter { it.day == selectedDay.toString() }.sortedBy { it.at }
+    val dayPunches = punchList.filter { it.day == selectedDay.toString() }.sortedByDescending { it.at }
     val monthKey = today.format(DateTimeFormatter.ofPattern("yyyy-MM"))
     val todayPunches = punchList.filter { it.day == today.toString() }.sortedBy { it.at }
     val lastTempOutIndex = todayPunches.indexOfLast { it.type == "TEMP_OUT" }
