@@ -122,20 +122,22 @@ fun WorkClockApp(context: Context) {
     fun doPunch(type: String) {
         if (!configured) { showSettings = true; message = "请先完成 R2 配置"; return }
         if (!loggedIn) { message = "请先登录"; return }
-        if (ssid.isNotBlank()) {
-            val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            if (!wm.isWifiEnabled) {
-                message = "Wi-Fi 验证失败：手机 Wi-Fi 未开启，请连接指定 Wi-Fi 后重试。"; return
+        if (ssid.isBlank()) {
+            message = "尚未设置考勤 Wi-Fi。请联系管理员配置指定 Wi-Fi 后再打卡。"
+            return
+        }
+        val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        if (!wm.isWifiEnabled) {
+            message = "Wi-Fi 验证失败：手机 Wi-Fi 未开启，请连接指定 Wi-Fi 后重试。"; return
+        }
+        @Suppress("DEPRECATION")
+        val current = runCatching { wm.connectionInfo?.ssid?.trim('"') }.getOrNull()
+        when {
+            current.isNullOrBlank() || current == "<unknown ssid>" -> {
+                message = "Wi-Fi 验证失败：Android 未向 App 提供当前 Wi-Fi 名称。请检查 App 的定位/附近 Wi-Fi 权限，并开启手机定位后重试。"; return
             }
-            @Suppress("DEPRECATION")
-            val current = runCatching { wm.connectionInfo?.ssid?.trim('"') }.getOrNull()
-            when {
-                current.isNullOrBlank() || current == "<unknown ssid>" -> {
-                    message = "Wi-Fi 验证失败：Android 未向 App 提供当前 Wi-Fi 名称。请检查 App 的定位/附近 Wi-Fi 权限，并开启手机定位后重试。"; return
-                }
-                current != ssid.trim() -> {
-                    message = "Wi-Fi 名称不匹配：当前读取到“$current”，要求“${ssid.trim()}”。请确认连接了指定 Wi-Fi，名称需完全一致。"; return
-                }
+            current != ssid.trim() -> {
+                message = "Wi-Fi 名称不匹配：当前读取到“$current”，要求“${ssid.trim()}”。请确认连接了指定 Wi-Fi，名称需完全一致。"; return
             }
         }
         scope.launch {
@@ -450,7 +452,7 @@ fun WorkClockApp(context: Context) {
                                     OutlinedTextField(access, { access = it }, label = { Text("Access Key ID") }, singleLine = true)
                                     OutlinedTextField(secret, { secret = it }, label = { Text("Secret Access Key") }, singleLine = true)
                                     if (role == "admin" && loggedIn) {
-                                        OutlinedTextField(ssid, { ssid = it }, label = { Text("指定 WiFi 名称（可选）") }, singleLine = true)
+                                        OutlinedTextField(ssid, { if (role == "admin" || !loggedIn) ssid = it }, label = { Text("指定 WiFi 名称（管理员必填）") }, supportingText = { Text("未设置指定 Wi-Fi 时，所有账号均不能打卡。") }, singleLine = true, enabled = role == "admin" || !loggedIn)
                                     }
                                 }
                                 if (connectionTest.isNotBlank()) Text(connectionTest, color = if (connectionTest.startsWith("连接成功")) Color(0xFF16865C) else Blue, fontSize = 12.sp)
