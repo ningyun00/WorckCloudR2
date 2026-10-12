@@ -47,7 +47,13 @@ class R2Store(private val config: R2Config) {
     private fun readText(key: String): String? = try {
         client.getObjectAsBytes(GetObjectRequest.builder().bucket(config.bucket).key(key).build()).asUtf8String()
     } catch (e: Exception) {
-        if (e.message?.contains("NoSuchKey", true) == true || e.message?.contains("404") == true) null else throw e
+        val s3 = e as? software.amazon.awssdk.services.s3.model.S3Exception
+        // S3-compatible services may report a missing object through statusCode rather than message text.
+        if (s3?.statusCode() == 404 ||
+            e.message?.contains("NoSuchKey", true) == true ||
+            e.message?.contains("NotFound", true) == true ||
+            e.message?.contains("404", true) == true
+        ) null else throw e
     }
 
     private fun writeText(key: String, content: String) {
@@ -95,11 +101,21 @@ class R2Store(private val config: R2Config) {
     }
 
     fun readPunches(month: String): List<Punch> {
-        val raw = readText("attendance/$month.json") ?: return emptyList()
+        val key = "attendance/$month.json"
+        var raw = readText(key)
+        if (raw == null) {
+            // First use of a month: create the JSON object explicitly, then read it back.
+            writeText(key, "[]")
+            raw = readText(key)
+                ?: throw IllegalStateException("已创建 $key，但重新读取仍不存在；请检查 R2 写入/读取权限")
+        }
         return try {
             val type = object : TypeToken<List<Punch>>() {}.type
-            gson.fromJson<List<Punch>>(raw, type) ?: emptyList()
-        } catch (_: Exception) { emptyList() }
+            gson.fromJson<List<Punch>>(raw, type)
+                ?: throw IllegalStateException("$key 内容为空或不是有效的考勤 JSON 数组")
+        } catch (e: Exception) {
+            throw IllegalStateException("读取 $key 失败，文件内容不是有效 JSON；为避免覆盖原数据，已停止写入。原因：${e.message}", e)
+        }
     }
 
     fun writePunches(month: String, punches: List<Punch>) {
