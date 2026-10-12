@@ -208,7 +208,7 @@ fun WorkClockApp(context: Context) {
                         }
                     }, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "保存中…" else "保存新密码") }
                     if (message.isNotBlank()) Text(message, color = Blue)
-                    TextButton(onClick = { loggedIn = false; prefs.edit().putBoolean("loggedIn", false).apply() }) { Text("退出登录") }
+                    TextButton(onClick = { loggedIn = false; configUnlocked = false; prefs.edit().putBoolean("loggedIn", false).apply() }) { Text("退出登录") }
                 }
             } else {
                 LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -288,6 +288,7 @@ fun WorkClockApp(context: Context) {
                     item {
                         OutlinedButton(onClick = {
                             loggedIn = false
+                            configUnlocked = false
                             prefs.edit().putBoolean("loggedIn", false).apply()
                             message = "已退出登录"
                         }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Logout, null); Spacer(Modifier.width(8.dp)); Text("退出登录") }
