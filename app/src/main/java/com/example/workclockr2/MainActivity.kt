@@ -105,6 +105,7 @@ fun WorkClockApp(context: Context) {
     var summaryPunches by remember { mutableStateOf(listOf<Punch>()) }
     var summaryError by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    val configured = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()
     DisposableEffect(context) {
         val activity = context as? ComponentActivity
         val observer = LifecycleEventObserver { _, event ->
@@ -140,7 +141,6 @@ fun WorkClockApp(context: Context) {
         activity?.lifecycle?.addObserver(observer)
         onDispose { activity?.lifecycle?.removeObserver(observer) }
     }
-    val configured = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()
     val restrictedUserSettings = configured && loggedIn && role != "admin"
     val hideR2Credentials = configured && !configUnlocked
     val today = LocalDate.now()
