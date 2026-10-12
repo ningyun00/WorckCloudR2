@@ -73,6 +73,7 @@ fun WorkClockApp(context: Context) {
     var ssid by remember { mutableStateOf(prefs.getString("ssid", "") ?: "") }
     var showSettings by remember { mutableStateOf(false) }
     var configMethod by remember { mutableStateOf("选择配置方式") }
+    var qrConfigCompleted by remember { mutableStateOf(prefs.getBoolean("qr_config_completed", false)) }
     var qrScanMessage by remember { mutableStateOf("") }
     var employeeId by remember { mutableStateOf(prefs.getString("employee", "") ?: "") }
     var employeeName by remember { mutableStateOf(prefs.getString("name", "") ?: "员工") }
@@ -274,9 +275,10 @@ fun WorkClockApp(context: Context) {
                     secret = json.get("SecretAccessKey")?.asString ?: json.get("secret")?.asString ?: json.get("secretKey")?.asString ?: ""
                     ssid = json.get("SSID")?.asString ?: json.get("ssid")?.asString ?: json.get("allowedSsid")?.asString ?: ""
                     require(account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { "二维码缺少 account、access 或 secret 字段" }
-                    prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2").putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).commit()
-                    configMethod = "扫码配置"
-                    qrScanMessage = "扫码成功，请点击“保存配置”完成设置。"
+                    prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2").putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).putBoolean("qr_config_completed", true).commit()
+                    qrConfigCompleted = true
+                    configMethod = "手动配置"
+                    qrScanMessage = "扫码成功，已切换为手动配置。请确认信息后点击保存配置。"
                 } catch (e: Exception) { qrScanMessage = "二维码格式不正确：" + (e.message ?: "请使用 R2 配置二维码") }
             }
             .addOnFailureListener { error -> qrScanMessage = "扫码取消或失败：" + error.toString() }
@@ -1186,15 +1188,19 @@ fun WorkClockApp(context: Context) {
                         when (if (role == "admin" && loggedIn) settingsPage else 0) {
                             0 -> {
                                 if (role != "admin" || !loggedIn) {
-                                    Text("选择 R2 配置方式", color = Ink, fontWeight = FontWeight.Bold)
-                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        FilterChip(selected = configMethod == "扫码配置", onClick = { configMethod = "扫码配置" }, label = { Text("扫码配置") })
-                                        FilterChip(selected = configMethod == "手动配置", onClick = { configMethod = "手动配置" }, label = { Text("手动配置") })
-                                    }
-                                    if (configMethod == "扫码配置") {
-                                        Text("扫描管理员提供的 R2 配置二维码，内容需包含 account、access、secret，可选 ssid。", color = Muted, fontSize = 12.sp)
-                                        Button(onClick = { scanR2Qr() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.QrCodeScanner, null); Spacer(Modifier.width(8.dp)); Text("开始扫码") }
-                                        if (qrScanMessage.isNotBlank()) Text(qrScanMessage, color = Blue, fontSize = 12.sp)
+                                    if (!qrConfigCompleted) {
+                                        Text("选择 R2 配置方式", color = Ink, fontWeight = FontWeight.Bold)
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            FilterChip(selected = configMethod == "扫码配置", onClick = { configMethod = "扫码配置" }, label = { Text("扫码配置") })
+                                            FilterChip(selected = configMethod == "手动配置", onClick = { configMethod = "手动配置" }, label = { Text("手动配置") })
+                                        }
+                                        if (configMethod == "扫码配置") {
+                                            Text("扫描管理员提供的 R2 配置二维码，内容需包含 account、access、secret，可选 ssid。", color = Muted, fontSize = 12.sp)
+                                            Button(onClick = { scanR2Qr() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.QrCodeScanner, null); Spacer(Modifier.width(8.dp)); Text("开始扫码") }
+                                            if (qrScanMessage.isNotBlank()) Text(qrScanMessage, color = Blue, fontSize = 12.sp)
+                                        }
+                                    } else {
+                                        Text("扫码配置已完成，当前仅显示手动配置。", color = Muted, fontSize = 12.sp)
                                     }
                                 }
                                 if (restrictedUserSettings) {
