@@ -269,10 +269,10 @@ fun WorkClockApp(context: Context) {
                 try {
                     val payload = barcode.rawValue ?: error("二维码没有内容")
                     val json = com.google.gson.JsonParser.parseString(payload).asJsonObject
-                    account = json.get("account")?.asString ?: json.get("accountId")?.asString ?: ""
-                    access = json.get("access")?.asString ?: json.get("accessKey")?.asString ?: ""
-                    secret = json.get("secret")?.asString ?: json.get("secretKey")?.asString ?: ""
-                    ssid = json.get("ssid")?.asString ?: json.get("allowedSsid")?.asString ?: ""
+                    account = json.get("AccountID")?.asString ?: json.get("account")?.asString ?: json.get("accountId")?.asString ?: ""
+                    access = json.get("AccessKeyID")?.asString ?: json.get("access")?.asString ?: json.get("accessKey")?.asString ?: ""
+                    secret = json.get("SecretAccessKey")?.asString ?: json.get("secret")?.asString ?: json.get("secretKey")?.asString ?: ""
+                    ssid = json.get("SSID")?.asString ?: json.get("ssid")?.asString ?: json.get("allowedSsid")?.asString ?: ""
                     require(account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { "二维码缺少 account、access 或 secret 字段" }
                     prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2").putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).commit()
                     configMethod = "扫码配置"
