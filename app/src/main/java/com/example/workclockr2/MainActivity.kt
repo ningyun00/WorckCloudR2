@@ -107,7 +107,10 @@ fun WorkClockApp(context: Context) {
     val fmt = DateTimeFormatter.ofPattern("HH:mm:ss")
     val dayPunches = punchList.filter { it.day == selectedDay.toString() }.sortedBy { it.at }
     val monthKey = today.format(DateTimeFormatter.ofPattern("yyyy-MM"))
-    val active = dayPunches.lastOrNull()?.type == "IN"
+    val todayPunches = punchList.filter { it.day == today.toString() }.sortedBy { it.at }
+    val lastTempOutIndex = todayPunches.indexOfLast { it.type == "TEMP_OUT" }
+    // After the first IN, ordinary punches remain OUT punches; only TEMP_OUT resets the next punch to IN.
+    val active = todayPunches.drop(lastTempOutIndex + 1).any { it.type == "IN" }
     val hours = calculateHours(dayPunches)
 
     fun saveConfig() {
@@ -239,7 +242,7 @@ fun WorkClockApp(context: Context) {
                     var drag = 0f
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { _, amount -> drag += amount },
-                        onDragEnd = { if (drag < -70f) showAdminSummary = false; drag = 0f },
+                        onDragEnd = { if (drag > 70f) showAdminSummary = false; drag = 0f },
                         onDragCancel = { drag = 0f }
                     )
                 }.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -306,7 +309,7 @@ fun WorkClockApp(context: Context) {
                             }
                         }
                     }
-                    Text("向左滑动返回打卡页面", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                    Text("向右滑动返回打卡页面", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                 }
             } else {
                 LazyColumn(Modifier.fillMaxSize().padding(padding).pointerInput(role) {
@@ -314,7 +317,7 @@ fun WorkClockApp(context: Context) {
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { _, amount -> drag += amount },
                         onDragEnd = {
-                            if (role == "admin" && drag > 70f) {
+                            if (role == "admin" && drag < -70f) {
                                 showAdminSummary = true
                                 scope.launch {
                                     summaryLoading = true
@@ -567,26 +570,40 @@ private fun calculateHours(items: List<Punch>): Double {
     if (items.isEmpty()) return 0.0
     val sorted = items.sortedBy { it.at }
     var start: Instant? = null
+    var lastOut: Instant? = null
     var total = 0L
-    var hasTemp = false
+
+    fun instant(p: Punch): Instant? =
+        runCatching { ZonedDateTime.parse(p.at).toInstant() }.getOrNull()
+
     for (p in sorted) {
-        val instant = runCatching { ZonedDateTime.parse(p.at).toInstant() }.getOrNull() ?: continue
+        val at = instant(p) ?: continue
         when (p.type) {
-            "IN" -> if (start == null) start = instant
-            "TEMP_OUT" -> {
-                if (start != null) { total += Duration.between(start, instant).toMillis().coerceAtLeast(0); start = null; hasTemp = true }
+            "IN" -> {
+                // Start a new work interval. A TEMP_OUT explicitly resets the next punch to IN.
+                if (start == null) {
+                    start = at
+                    lastOut = null
+                }
             }
-            "OUT" -> if (start != null) { total += Duration.between(start, instant).toMillis().coerceAtLeast(0); start = null }
+            "OUT" -> {
+                // Ordinary OUT punches do not reset the state; the latest OUT is the interval end.
+                if (start != null) lastOut = at
+            }
+            "TEMP_OUT" -> {
+                // Temporary departure closes this interval; next punch may start a new one.
+                if (start != null) {
+                    val end = lastOut ?: at
+                    total += Duration.between(start, end).toMillis().coerceAtLeast(0)
+                    start = null
+                    lastOut = null
+                }
+            }
         }
     }
-    if (!hasTemp) {
-        val first = sorted.firstOrNull { it.type == "IN" }
-        val last = sorted.lastOrNull { it.type == "OUT" }
-        if (first != null && last != null) {
-            val a = runCatching { ZonedDateTime.parse(first.at).toInstant() }.getOrNull()
-            val b = runCatching { ZonedDateTime.parse(last.at).toInstant() }.getOrNull()
-            if (a != null && b != null) return Duration.between(a,b).toMillis().coerceAtLeast(0) / 3600000.0
-        }
+    // An open interval is counted only up to the latest ordinary OUT punch.
+    if (start != null && lastOut != null) {
+        total += Duration.between(start, lastOut!!).toMillis().coerceAtLeast(0)
     }
     return total / 3600000.0
 }
