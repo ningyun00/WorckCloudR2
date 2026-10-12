@@ -92,6 +92,7 @@ fun WorkClockApp(context: Context) {
     val scope = rememberCoroutineScope()
     val configured = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()
     val restrictedUserSettings = configured && loggedIn && role != "admin"
+    val hideR2Credentials = configured && !configUnlocked && !(role == "admin" && loggedIn)
     val today = LocalDate.now()
     val fmt = DateTimeFormatter.ofPattern("HH:mm:ss")
     val dayPunches = punchList.filter { it.day == selectedDay.toString() }.sortedBy { it.at }
