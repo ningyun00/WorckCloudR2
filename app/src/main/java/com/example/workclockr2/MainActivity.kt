@@ -373,10 +373,10 @@ fun WorkClockApp(context: Context) {
                     }
                 },
                 confirmButton = {
-                    if (restrictedUserSettings) {
+                    if (restrictedUserSettings || hideR2Credentials) {
                         TextButton(onClick = { showSettings = false }) { Text("完成") }
                     } else if (settingsPage == 0 || role != "admin" || !loggedIn) {
-                        Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") }
+                        Button(onClick = { saveConfig(); configUnlocked = false }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") }
                     } else {
                         TextButton(onClick = { showSettings = false }) { Text("完成") }
                     }
