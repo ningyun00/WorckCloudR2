@@ -75,6 +75,7 @@ fun WorkClockApp(context: Context) {
     var loggedIn by remember { mutableStateOf(prefs.getBoolean("loggedIn", false)) }
     var punchList by remember { mutableStateOf(listOf<Punch>()) }
     var selectedDay by remember { mutableStateOf(LocalDate.now()) }
+    var showMonthCalendar by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("尚未打卡") }
     var message by remember { mutableStateOf("") }
     var showMessageDialog by remember { mutableStateOf(false) }
