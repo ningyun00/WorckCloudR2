@@ -139,12 +139,7 @@ fun WorkClockApp(context: Context) {
     DisposableEffect(context) {
         val activity = context as? ComponentActivity
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
-                configUnlocked = false
-                showAdminConfigAuth = false
-                adminConfigPassword = ""
-                configAuthMessage = ""
-            } else if (event == Lifecycle.Event.ON_RESUME && loggedIn && configured) {
+            if (event == Lifecycle.Event.ON_RESUME && loggedIn && configured) {
                 // Refresh attendance automatically whenever the app returns to the foreground.
                 scope.launch {
                     try {
