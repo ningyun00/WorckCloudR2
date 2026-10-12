@@ -106,6 +106,7 @@ fun WorkClockApp(context: Context) {
     var summaryPunches by remember { mutableStateOf(listOf<Punch>()) }
     var summaryError by remember { mutableStateOf("") }
     var selectedSummaryEmployee by remember { mutableStateOf<Employee?>(null) }
+    var selectedSummaryDay by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val configured = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()
     DisposableEffect(context) {
@@ -338,11 +339,23 @@ fun WorkClockApp(context: Context) {
             } else if (selectedSummaryEmployee != null && role == "admin") {
                 val emp = selectedSummaryEmployee!!
                 val empPunches = summaryPunches.filter { it.employeeId == emp.employeeId && it.day.startsWith(monthKey) }
-                val empDays = empPunches.map { it.day }.distinct().sortedDescending()
+                val empDays = empPunches.map { it.day }.distinct()
                 val empTotalHours = empPunches.groupBy { it.day }.values.sumOf { calculateHours(it) }
+                val reportMonth = YearMonth.now()
+                val calendarStartOffset = reportMonth.atDay(1).dayOfWeek.value - 1
+                val calendarCells: List<LocalDate?> = List(calendarStartOffset) { null } +
+                    (1..reportMonth.lengthOfMonth()).map { reportMonth.atDay(it) }
+                val selectedDayPunches = selectedSummaryDay?.let { day ->
+                    empPunches.filter { it.day == day }.sortedBy { it.at }
+                } ?: emptyList()
                 Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = { selectedSummaryEmployee = null }) { Icon(Icons.Default.ArrowBack, null); Text("返回全员") }
+                        TextButton(onClick = {
+                            if (selectedSummaryDay != null) selectedSummaryDay = null else selectedSummaryEmployee = null
+                        }) {
+                            Icon(Icons.Default.ArrowBack, null)
+                            Text(if (selectedSummaryDay != null) "返回日历" else "返回全员")
+                        }
                         Spacer(Modifier.width(8.dp))
                         Column {
                             Text(emp.displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Ink)
@@ -365,30 +378,65 @@ fun WorkClockApp(context: Context) {
                         }
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text("每日工时报表", color = Ink, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(6.dp))
-                    if (empDays.isEmpty()) {
-                        Text("本月暂无打卡记录", color = Muted, modifier = Modifier.padding(vertical = 12.dp))
-                    } else {
-                        LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(empDays) { day ->
-                                val dayItems = empPunches.filter { it.day == day }.sortedBy { it.at }
-                                Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(12.dp)) {
-                                    Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                            Text(day, color = Ink, fontWeight = FontWeight.Bold)
-                                            Text(String.format("%.2f 小时", calculateHours(dayItems)), color = Blue, fontWeight = FontWeight.Bold)
-                                        }
-                                        dayItems.forEach { punch ->
-                                            Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                Text(when(punch.type) { "IN" -> "上班"; "OUT" -> "下班"; else -> "临时下班" }, color = Muted, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                                                Text(punch.at.replace("T", " ").take(19), color = Muted, fontSize = 12.sp)
-                                            }
+                    if (selectedSummaryDay != null) {
+                        Text(selectedSummaryDay!!, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("当日工时：${String.format("%.2f", calculateHours(selectedDayPunches))} 小时", color = Blue, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        if (selectedDayPunches.isEmpty()) {
+                            Text("当天没有打卡记录", color = Muted, modifier = Modifier.padding(vertical = 12.dp))
+                        } else {
+                            LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(selectedDayPunches) { punch ->
+                                    Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(12.dp)) {
+                                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Text(when (punch.type) { "IN" -> "上班打卡"; "OUT" -> "下班打卡"; else -> "临时下班" },
+                                                color = Ink, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                            Text(punch.at.replace("T", " ").take(19), color = Muted, fontSize = 13.sp)
                                         }
                                     }
                                 }
                             }
                         }
+                    } else {
+                        Text("月度日历 · 点击日期查看打卡明细", color = Ink, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                        Text("${reportMonth.year}年${reportMonth.monthValue}月", color = Muted, fontSize = 13.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Row(Modifier.fillMaxWidth()) {
+                            listOf("一", "二", "三", "四", "五", "六", "日").forEach { weekday ->
+                                Text(weekday, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            calendarCells.chunked(7).forEach { week ->
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    week.forEach { date ->
+                                        if (date == null) {
+                                            Spacer(Modifier.weight(1f).height(66.dp))
+                                        } else {
+                                            val dayKey = date.toString()
+                                            val dayItems = empPunches.filter { it.day == dayKey }.sortedBy { it.at }
+                                            val dayHours = calculateHours(dayItems)
+                                            val hasPunch = dayItems.isNotEmpty()
+                                            Card(
+                                                modifier = Modifier.weight(1f).height(66.dp).clickable { selectedSummaryDay = dayKey },
+                                                colors = CardDefaults.cardColors(containerColor = if (hasPunch) Color(0xFFEAF2FF) else Color.White),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Column(Modifier.fillMaxSize().padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.Center) {
+                                                    Text(date.dayOfMonth.toString(), color = if (hasPunch) Blue else Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                    if (hasPunch) Text(String.format("%.1f小时", dayHours), color = Blue, fontSize = 9.sp, maxLines = 1)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    repeat((7 - week.size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f).height(66.dp)) }
+                                }
+                            }
+                        }
+                        Text("有打卡记录的日期会显示当天工时；点击任意日期可查看该日记录。", color = Muted, fontSize = 11.sp)
                     }
                 }
             } else if (showAdminSummary && role == "admin") {
