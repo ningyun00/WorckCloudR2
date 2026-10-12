@@ -205,9 +205,26 @@ fun WorkClockApp(context: Context) {
     val active = todayPunches.drop(lastTempOutIndex + 1).any { it.type == "IN" }
     val hours = calculateHours(dayPunches)
 
+    // Persist valid credentials as they are entered, not only when the dialog button is tapped.
+    LaunchedEffect(account, access, secret, ssid) {
+        if (account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) {
+            prefs.edit()
+                .putString("account", account.trim())
+                .putString("bucket", "workcloudr2")
+                .putString("access", access.trim())
+                .putString("secret", secret)
+                .putString("ssid", ssid.trim())
+                .commit()
+        }
+    }
+
     fun saveConfig() {
-        prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2")
+        val saved = prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2")
             .putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).commit()
+        if (!saved) {
+            message = "R2 配置写入本机失败，请检查手机存储空间。"
+            return
+        }
         showSettings = false
         scope.launch {
             if (ssid.isBlank()) {
