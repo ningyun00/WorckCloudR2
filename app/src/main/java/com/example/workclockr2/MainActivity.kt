@@ -371,7 +371,7 @@ fun WorkClockApp(context: Context) {
     }
 
     var darkMode by remember { mutableStateOf(prefs.getBoolean("dark_mode", false)) }
-    val themeBackground = if (darkMode) Color(0xFF101820) else themeBackground
+    val themeBackground = if (darkMode) Color(0xFF101820) else Color(0xFFF4F7FC)
     val themeSurface = if (darkMode) Color(0xFF1B2632) else Color.White
     val themeInk = if (darkMode) Color(0xFFE7EDF5) else Ink
     val themeMuted = if (darkMode) Color(0xFFA8B5C5) else Muted
