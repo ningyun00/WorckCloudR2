@@ -11,6 +11,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -91,6 +93,11 @@ fun WorkClockApp(context: Context) {
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var needChangePassword by remember { mutableStateOf(false) }
+    var showAdminSummary by remember { mutableStateOf(false) }
+    var summaryLoading by remember { mutableStateOf(false) }
+    var summaryEmployees by remember { mutableStateOf(listOf<Employee>()) }
+    var summaryPunches by remember { mutableStateOf(listOf<Punch>()) }
+    var summaryError by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val configured = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()
     val restrictedUserSettings = configured && loggedIn && role != "admin"
@@ -226,8 +233,105 @@ fun WorkClockApp(context: Context) {
                     if (message.isNotBlank()) Text(message, color = Blue)
                     TextButton(onClick = { loggedIn = false; configUnlocked = false; prefs.edit().putBoolean("loggedIn", false).apply() }) { Text("退出登录") }
                 }
+            } else if (showAdminSummary && role == "admin") {
+                Column(Modifier.fillMaxSize().padding(padding).pointerInput(role) {
+                    var drag = 0f
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { _, amount -> drag += amount },
+                        onDragEnd = { if (drag < -70f) showAdminSummary = false; drag = 0f },
+                        onDragCancel = { drag = 0f }
+                    )
+                }.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("全员打卡合计", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Ink)
+                            Text(today.format(DateTimeFormatter.ofPattern("yyyy年MM月")) + " · 本月累计工时", color = Muted, fontSize = 13.sp)
+                        }
+                        TextButton(onClick = { showAdminSummary = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回") }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Button(enabled = !summaryLoading, onClick = {
+                        scope.launch {
+                            summaryLoading = true
+                            summaryError = ""
+                            try {
+                                val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                summaryEmployees = store.readEmployeesAsync().filter { it.enabled }
+                                summaryPunches = store.readPunchesAsync(monthKey)
+                            } catch (e: Exception) {
+                                summaryError = "读取合计失败：${e.message ?: e.javaClass.simpleName}"
+                            } finally { summaryLoading = false }
+                        }
+                    }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(8.dp))
+                        Text(if (summaryLoading) "正在读取…" else "刷新全员数据")
+                    }
+                    if (summaryError.isNotBlank()) Text(summaryError, color = Color(0xFFD34B54), modifier = Modifier.padding(vertical = 8.dp))
+                    val totalHours = summaryEmployees.sumOf { emp ->
+                        calculateHours(summaryPunches.filter { it.employeeId == emp.employeeId && it.day.startsWith(monthKey) })
+                    }
+                    Card(Modifier.fillMaxWidth().padding(top = 10.dp), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Column {
+                                Text("全员累计工时", color = Muted, fontSize = 13.sp)
+                                Text(String.format("%.2f 小时", totalHours), color = Blue, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("员工人数", color = Muted, fontSize = 13.sp)
+                                Text("${summaryEmployees.size}", color = Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    if (summaryEmployees.isEmpty() && !summaryLoading && summaryError.isBlank()) {
+                        Text("点击“刷新全员数据”读取 R2 中的员工和考勤记录。", color = Muted, modifier = Modifier.padding(top = 18.dp))
+                    } else {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            items(summaryEmployees.size) { index ->
+                                val emp = summaryEmployees[index]
+                                val empPunches = summaryPunches.filter { it.employeeId == emp.employeeId && it.day.startsWith(monthKey) }
+                                Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                            Column(Modifier.weight(1f)) {
+                                                Text(emp.displayName, color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                Text("${emp.employeeId} · ${if (emp.role == "admin") "管理员" else "员工"}", color = Muted, fontSize = 12.sp)
+                                            }
+                                            Text(String.format("%.2f 小时", calculateHours(empPunches)), color = Blue, fontWeight = FontWeight.Bold)
+                                        }
+                                        Text("打卡 ${empPunches.size} 次 · ${empPunches.map { it.day }.distinct().size} 天", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Text("向左滑动返回打卡页面", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                }
             } else {
-                LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                LazyColumn(Modifier.fillMaxSize().padding(padding).pointerInput(role) {
+                    var drag = 0f
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { _, amount -> drag += amount },
+                        onDragEnd = {
+                            if (role == "admin" && drag > 70f) {
+                                showAdminSummary = true
+                                scope.launch {
+                                    summaryLoading = true
+                                    summaryError = ""
+                                    try {
+                                        val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                        summaryEmployees = store.readEmployeesAsync().filter { it.enabled }
+                                        summaryPunches = store.readPunchesAsync(monthKey)
+                                    } catch (e: Exception) {
+                                        summaryError = "读取合计失败：${e.message ?: e.javaClass.simpleName}"
+                                    } finally { summaryLoading = false }
+                                }
+                            }
+                            drag = 0f
+                        },
+                        onDragCancel = { drag = 0f }
+                    )
+                }, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     item {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             TextButton(onClick = { doPunch("TEMP_OUT") }, enabled = !busy) {
