@@ -132,18 +132,7 @@ fun WorkClockApp(context: Context) {
                 val cfg = R2Config(account, bucket, access, secret, ssid)
                 val now = ZonedDateTime.now().toString()
                 val punch = Punch(employeeId = employeeId, at = now, type = type, day = today.toString())
-                val saved = withContext(Dispatchers.IO) {
-                    val store = R2Store(cfg)
-                    val existing = store.readPunches(monthKey)
-                    val merged = existing.filterNot { it.id == punch.id } + punch
-                    store.writePunches(monthKey, merged)
-                    // Read-after-write verification: do not report success unless R2 returns this record.
-                    val confirmed = store.readPunches(monthKey)
-                    check(confirmed.any { it.id == punch.id }) {
-                        "写入请求已发送，但从 R2 重新读取后未找到本次记录"
-                    }
-                    confirmed
-                }
+                val saved = R2Store(cfg).updatePunchesAndVerifyAsync(monthKey, punch)
                 punchList = saved.filter { it.employeeId == employeeId }
                 status = when(type) { "IN" -> "已上班"; "OUT" -> "已下班"; else -> "临时下班已记录" }
                 message = "$status · 已保存并验证 · ${ZonedDateTime.now().format(fmt)}"
@@ -186,7 +175,7 @@ fun WorkClockApp(context: Context) {
                             busy = true
                             try {
                                 val store = R2Store(R2Config(account,bucket,access,secret,ssid))
-                                val emp = withContext(Dispatchers.IO) { store.readEmployees() }
+                                val emp = store.readEmployeesAsync()
                                     .firstOrNull { it.employeeId == loginId && it.enabled }
                                 if (emp == null) message = "工号不存在或已停用"
                                 else if (!R2Store.verifyPassword(emp, loginPassword)) message = "密码错误"
@@ -194,7 +183,7 @@ fun WorkClockApp(context: Context) {
                                     employeeId = emp.employeeId; employeeName = emp.displayName; role = emp.role
                                     loggedIn = true; needChangePassword = emp.mustChangePassword
                                     prefs.edit().putString("employee", employeeId).putString("name", employeeName).putString("role", role).putBoolean("loggedIn", true).apply()
-                                    punchList = runCatching { withContext(Dispatchers.IO) { store.readPunches(monthKey) }.filter { it.employeeId == employeeId } }.getOrDefault(emptyList())
+                                    punchList = runCatching { store.readPunchesAsync(monthKey).filter { it.employeeId == employeeId } }.getOrDefault(emptyList())
                                     message = if (needChangePassword) "当前为初始密码，请联系管理员更新 employees.json 中的密码配置。" else "登录成功"
                                 }
                             } catch (e: Exception) { message = "登录失败：${e.message ?: "请检查 R2 文件"}" }
@@ -215,10 +204,8 @@ fun WorkClockApp(context: Context) {
                             busy = true
                             try {
                                 val store = R2Store(R2Config(account,bucket,access,secret,ssid))
-                                withContext(Dispatchers.IO) {
-                                    val list = store.readEmployees()
-                                    store.writeEmployees(list.map { if (it.employeeId == employeeId) R2Store.createEmployee(it.employeeId,it.displayName,it.role,newPassword,false,it.enabled) else it })
-                                }
+                                val list = store.readEmployeesAsync()
+                                store.writeEmployeesAsync(list.map { if (it.employeeId == employeeId) R2Store.createEmployee(it.employeeId,it.displayName,it.role,newPassword,false,it.enabled) else it })
                                 needChangePassword = false; newPassword = ""; confirmPassword = ""; message = "密码已更新"
                             } catch (e: Exception) { message = "修改失败：" + (e.message ?: "请检查 R2 权限") }
                             finally { busy = false }
@@ -357,7 +344,7 @@ fun WorkClockApp(context: Context) {
                                         busy = true
                                         try {
                                             val store = R2Store(R2Config(account,bucket,access,secret,ssid))
-                                            withContext(Dispatchers.IO) { val list = store.readEmployees(); store.writeEmployees(list.map { if (it.employeeId == employeeId) R2Store.createEmployee(it.employeeId,it.displayName,it.role,adminNewPassword,false,it.enabled) else it }) }
+                                            val list = store.readEmployeesAsync(); store.writeEmployeesAsync(list.map { if (it.employeeId == employeeId) R2Store.createEmployee(it.employeeId,it.displayName,it.role,adminNewPassword,false,it.enabled) else it })
                                             adminNewPassword = ""; adminConfirmPassword = ""; message = "管理员密码已更新"
                                         } catch (e: Exception) { message = "修改失败：" + (e.message ?: "请检查 R2 权限") }
                                         finally { busy = false }
@@ -379,7 +366,7 @@ fun WorkClockApp(context: Context) {
                                         try {
                                             val normalizedId = createId.trim().padStart(6, '0')
                                             val store = R2Store(R2Config(account,bucket,access,secret,ssid))
-                                            withContext(Dispatchers.IO) { val list = store.readEmployees(); require(list.none { it.employeeId == normalizedId }) { "该工号已存在" }; store.writeEmployees(list + R2Store.createEmployee(normalizedId,createName.trim(),createRole,normalizedId,true,true)) }
+                                            val list = store.readEmployeesAsync(); require(list.none { it.employeeId == normalizedId }) { "该工号已存在" }; store.writeEmployeesAsync(list + R2Store.createEmployee(normalizedId,createName.trim(),createRole,normalizedId,true,true))
                                             message = "账号创建成功，工号：${createId.trim().padStart(6, '0')}，初始密码为该六位工号"; createId = ""; createName = ""
                                         } catch (e: Exception) { message = "创建失败：" + (e.message ?: "请检查 R2 写权限") }
                                         finally { creatingEmployee = false }
@@ -404,7 +391,7 @@ fun WorkClockApp(context: Context) {
                         if (settingsPage == 0 || role != "admin" || !loggedIn) TextButton(enabled = !testingConnection && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {
                             scope.launch {
                                 testingConnection = true; connectionTest = "正在测试连接…"
-                                try { connectionTest = withContext(Dispatchers.IO) { R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid)).testConnection() } }
+                                try { connectionTest = R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid)).testConnectionAsync() }
                                 catch (e: Exception) { connectionTest = "测试异常：${e.message ?: e.javaClass.simpleName}" }
                                 finally { testingConnection = false }
                             }
@@ -435,7 +422,7 @@ fun WorkClockApp(context: Context) {
                             busy = true
                             try {
                                 val store = R2Store(R2Config(account, bucket, access, secret, ssid))
-                                val admins = withContext(Dispatchers.IO) { store.readEmployees() }
+                                val admins = store.readEmployeesAsync()
                                 val valid = admins.any { it.role == "admin" && it.enabled && R2Store.verifyPassword(it, adminConfigPassword) }
                                 if (valid) {
                                     configUnlocked = true
