@@ -265,9 +265,9 @@ fun WorkClockApp(context: Context) {
     fun scanR2Qr() {
         qrScanMessage = "正在打开扫码器…"
         GmsBarcodeScanning.getClient(context).startScan()
-            .addOnSuccessListener { barcode ->
+            .addOnSuccessListener { barcode: String ->
                 try {
-                    val payload = barcode.rawValue ?: error("二维码没有内容")
+                    val payload = barcode
                     val json = com.google.gson.JsonParser.parseString(payload).asJsonObject
                     account = json.get("AccountID")?.asString ?: json.get("account")?.asString ?: json.get("accountId")?.asString ?: ""
                     access = json.get("AccessKeyID")?.asString ?: json.get("access")?.asString ?: json.get("accessKey")?.asString ?: ""
@@ -279,7 +279,7 @@ fun WorkClockApp(context: Context) {
                     qrScanMessage = "扫码成功，请点击“保存配置”完成设置。"
                 } catch (e: Exception) { qrScanMessage = "二维码格式不正确：" + (e.message ?: "请使用 R2 配置二维码") }
             }
-            .addOnFailureListener { error -> qrScanMessage = "扫码取消或失败：" + error.toString() }
+            .addOnFailureListener { error: Exception -> qrScanMessage = "扫码取消或失败：" + error.toString() }
     }
     fun doPunch(type: String) {
         if (!configured) { showSettings = true; message = "请先完成 R2 配置"; return }
