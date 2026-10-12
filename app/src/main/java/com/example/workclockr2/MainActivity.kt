@@ -71,6 +71,10 @@ fun WorkClockApp(context: Context) {
     var status by remember { mutableStateOf("尚未打卡") }
     var message by remember { mutableStateOf("") }
     var connectionTest by remember { mutableStateOf("") }
+    var showAdminConfigAuth by remember { mutableStateOf(false) }
+    var adminConfigPassword by remember { mutableStateOf("") }
+    var configUnlocked by remember { mutableStateOf(false) }
+    var configAuthMessage by remember { mutableStateOf("") }
     var settingsPage by remember { mutableIntStateOf(0) }
     var adminNewPassword by remember { mutableStateOf("") }
     var adminConfirmPassword by remember { mutableStateOf("") }
