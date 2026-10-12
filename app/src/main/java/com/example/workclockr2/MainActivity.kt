@@ -279,7 +279,7 @@ fun WorkClockApp(context: Context) {
                     qrScanMessage = "扫码成功，请点击“保存配置”完成设置。"
                 } catch (e: Exception) { qrScanMessage = "二维码格式不正确：" + (e.message ?: "请使用 R2 配置二维码") }
             }
-            .addOnFailureListener { e -> qrScanMessage = "扫码取消或失败：" + (e.message ?: "请重试") }
+            .addOnFailureListener { error -> qrScanMessage = "扫码取消或失败：" + error.toString() }
     }
     fun doPunch(type: String) {
         if (!configured) { showSettings = true; message = "请先完成 R2 配置"; return }
