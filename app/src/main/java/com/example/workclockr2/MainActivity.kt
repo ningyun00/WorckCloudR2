@@ -312,6 +312,12 @@ fun WorkClockApp(context: Context) {
                                 if (restrictedUserSettings) {
                                     Text("存储桶：workcloudr2（固定）", color = Ink, fontWeight = FontWeight.Medium)
                                     Text("R2 配置由管理员统一管理。", color = Muted, fontSize = 12.sp)
+                                } else if (hideR2Credentials) {
+                                    Text("存储桶：workcloudr2（固定）", color = Ink, fontWeight = FontWeight.Medium)
+                                    Text("R2 配置已隐藏。需要查看或修改时，请验证管理员密码。", color = Muted, fontSize = 12.sp)
+                                    Button(onClick = { showAdminConfigAuth = true; adminConfigPassword = ""; configAuthMessage = "" }) {
+                                        Text("输入管理员密码查看配置")
+                                    }
                                 } else {
                                     Text("R2 S3 API 凭据。桶固定为 workcloudr2。", color = Muted, fontSize = 12.sp)
                                     OutlinedTextField(account, { account = it }, label = { Text("Account ID") }, singleLine = true)
