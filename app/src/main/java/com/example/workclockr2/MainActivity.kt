@@ -109,6 +109,15 @@ fun WorkClockApp(context: Context) {
     var confirmPassword by remember { mutableStateOf("") }
     var needChangePassword by remember { mutableStateOf(false) }
     var showAdminSummary by remember { mutableStateOf(false) }
+    var showMakeUpRecords by remember { mutableStateOf(false) }
+    var makeUpQueryEmployee by remember { mutableStateOf("") }
+    var makeUpQueryStart by remember { mutableStateOf(LocalDate.now().withDayOfMonth(1).toString()) }
+    var makeUpQueryEnd by remember { mutableStateOf(LocalDate.now().toString()) }
+    var makeUpQueryPunches by remember { mutableStateOf(listOf<Punch>()) }
+    var editingMakeUpGroup by remember { mutableStateOf<String?>(null) }
+    var editingMakeUpDate by remember { mutableStateOf(LocalDate.now().toString()) }
+    var editingMakeUpStart by remember { mutableStateOf("09:00") }
+    var editingMakeUpEnd by remember { mutableStateOf("18:00") }
     var summaryLoading by remember { mutableStateOf(false) }
     var summaryEmployees by remember { mutableStateOf(listOf<Employee>()) }
     var summaryPunches by remember { mutableStateOf(listOf<Punch>()) }
@@ -117,7 +126,7 @@ fun WorkClockApp(context: Context) {
     var selectedSummaryDay by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val canNavigateBack = showAdminConfigAuth || showSettings || needChangePassword ||
-        (role == "admin" && (selectedSummaryDay != null || selectedSummaryEmployee != null || showAdminSummary))
+        (role == "admin" && (selectedSummaryDay != null || selectedSummaryEmployee != null || showAdminSummary || showMakeUpRecords || editingMakeUpGroup != null))
     BackHandler(enabled = canNavigateBack) {
         when {
             showAdminConfigAuth -> {
@@ -134,6 +143,8 @@ fun WorkClockApp(context: Context) {
                 newPassword = ""
                 confirmPassword = ""
             }
+            role == "admin" && editingMakeUpGroup != null -> editingMakeUpGroup = null
+            role == "admin" && showMakeUpRecords -> showMakeUpRecords = false
             role == "admin" && selectedSummaryDay != null -> selectedSummaryDay = null
             role == "admin" && selectedSummaryEmployee != null -> {
                 selectedSummaryEmployee = null
@@ -528,7 +539,26 @@ fun WorkClockApp(context: Context) {
                         }
                         TextButton(onClick = { showAdminSummary = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回") }
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = {
+                        showMakeUpRecords = true
+                        editingMakeUpGroup = null
+                        makeUpQueryEmployee = ""
+                        makeUpQueryStart = LocalDate.now().withDayOfMonth(1).toString()
+                        makeUpQueryEnd = LocalDate.now().toString()
+                        scope.launch {
+                            summaryLoading = true
+                            try {
+                                val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                summaryEmployees = store.readEmployeesAsync().filter { it.enabled }
+                                makeUpQueryPunches = store.readPunchesAsync(monthKey).filter { it.id.startsWith("MAKEUP-") }
+                            } catch (e: Exception) { summaryError = "读取补班记录失败：${e.message ?: e.javaClass.simpleName}" }
+                            finally { summaryLoading = false }
+                        }
+                    }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.EventNote, null); Spacer(Modifier.width(8.dp)); Text("查看补班记录")
+                    }
+                    Spacer(Modifier.height(8.dp))
                     Button(enabled = !summaryLoading, onClick = {
                         scope.launch {
                             summaryLoading = true
@@ -902,11 +932,12 @@ fun WorkClockApp(context: Context) {
                                 val date = LocalDate.parse(makeUpDate)
                                 val store = R2Store(R2Config(account, bucket, access, secret, ssid))
                                 val additions = makeUpSegments.flatMap { segment ->
+                                    val groupId = UUID.randomUUID().toString()
                                     val startAt = date.atTime(LocalTime.parse(segment.start)).atZone(ZoneId.systemDefault())
                                     val endAt = date.atTime(LocalTime.parse(segment.end)).atZone(ZoneId.systemDefault())
                                     listOf(
-                                        Punch(employeeId = makeUpEmployeeId, at = startAt.toString(), type = "IN", day = date.toString()),
-                                        Punch(employeeId = makeUpEmployeeId, at = endAt.toString(), type = "OUT", day = date.toString())
+                                        Punch(id = "MAKEUP-$groupId-IN", employeeId = makeUpEmployeeId, at = startAt.toString(), type = "IN", day = date.toString()),
+                                        Punch(id = "MAKEUP-$groupId-OUT", employeeId = makeUpEmployeeId, at = endAt.toString(), type = "OUT", day = date.toString())
                                     )
                                 }
                                 val month = date.format(DateTimeFormatter.ofPattern("yyyy-MM"))
