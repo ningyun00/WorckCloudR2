@@ -395,6 +395,45 @@ fun WorkClockApp(context: Context) {
                     }
                 })
         }
+        if (showAdminConfigAuth) {
+            AlertDialog(
+                onDismissRequest = { showAdminConfigAuth = false },
+                title = { Text("管理员验证") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("输入管理员密码后，才能查看或修改 R2 配置。", color = Muted)
+                        OutlinedTextField(
+                            value = adminConfigPassword,
+                            onValueChange = { adminConfigPassword = it },
+                            label = { Text("管理员密码") },
+                            singleLine = true
+                        )
+                        if (configAuthMessage.isNotBlank()) Text(configAuthMessage, color = Color(0xFFD34B54))
+                    }
+                },
+                confirmButton = {
+                    Button(enabled = adminConfigPassword.isNotBlank() && !busy, onClick = {
+                        scope.launch {
+                            busy = true
+                            try {
+                                val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                val admins = withContext(Dispatchers.IO) { store.readEmployees() }
+                                val valid = admins.any { it.role == "admin" && it.enabled && R2Store.verifyPassword(it, adminConfigPassword) }
+                                if (valid) {
+                                    configUnlocked = true
+                                    showAdminConfigAuth = false
+                                    adminConfigPassword = ""
+                                    configAuthMessage = ""
+                                } else configAuthMessage = "管理员密码错误，或无法验证管理员账号。"
+                            } catch (e: Exception) {
+                                configAuthMessage = "验证失败：" + (e.message ?: "请检查当前 R2 配置")
+                            } finally { busy = false }
+                        }
+                    }) { Text(if (busy) "验证中…" else "验证并查看") }
+                },
+                dismissButton = { TextButton(onClick = { showAdminConfigAuth = false }) { Text("取消") } }
+            )
+        }
     }
 }
 
