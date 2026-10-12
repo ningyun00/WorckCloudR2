@@ -2,6 +2,8 @@ package com.example.workclockr2
 
 import android.Manifest
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
@@ -10,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -31,6 +34,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +55,8 @@ data class R2Config(val accountId: String, val bucket: String, val accessKey: St
 data class Punch(val id: String = UUID.randomUUID().toString(), val employeeId: String, val at: String, val type: String, val day: String)
 data class MakeUpSegment(val start: String = "09:00", val end: String = "18:00")
 data class Employee(val employeeId: String, val displayName: String, val role: String, val passwordSalt: String, val passwordHash: String, val mustChangePassword: Boolean, val enabled: Boolean)
+
+data class ProfileData(val employeeId: String, val name: String, val gender: String, val age: String, val avatarKey: String, val background: Int)
 
 class MainActivity : ComponentActivity() {
     private val requestPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
@@ -113,6 +120,31 @@ fun WorkClockApp(context: Context) {
     var confirmPassword by remember { mutableStateOf("") }
     var needChangePassword by remember { mutableStateOf(false) }
     var showAdminSummary by remember { mutableStateOf(false) }
+    var showProfile by remember { mutableStateOf(false) }
+    var profileGender by remember { mutableStateOf("未设置") }
+    var profileAge by remember { mutableStateOf("") }
+    var profileName by remember { mutableStateOf(prefs.getString("name", "员工") ?: "员工") }
+    var profileBackground by remember { mutableIntStateOf(prefs.getInt("profile_background", 0)) }
+    var profileAvatar by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var profileLoading by remember { mutableStateOf(false) }
+    var profileMessage by remember { mutableStateOf("") }
+    val avatarPicker = androidx.activity.compose.rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) scope.launch {
+            profileLoading = true
+            try {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("无法读取图片")
+                require(bytes.size <= 8 * 1024 * 1024) { "头像不能超过 8 MB" }
+                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: error("图片格式不支持")
+                val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                val key = "profiles/avatars/" + employeeId + ".jpg"
+                store.writeBinaryAsync(key, bytes, "image/jpeg")
+                store.writeProfileAsync(ProfileData(employeeId, profileName, profileGender, profileAge, key, profileBackground))
+                profileAvatar = bitmap
+                profileMessage = "头像已上传并保存到 R2。"
+            } catch (e: Exception) { profileMessage = "头像上传失败：" + (e.message ?: e.javaClass.simpleName) }
+            finally { profileLoading = false }
+        }
+    }
     var showMakeUpRecords by remember { mutableStateOf(false) }
     var makeUpQueryEmployee by remember { mutableStateOf("") }
     var makeUpQueryStart by remember { mutableStateOf(LocalDate.now().withDayOfMonth(1).toString()) }
@@ -548,6 +580,57 @@ fun WorkClockApp(context: Context) {
                         Text("有打卡记录的日期会显示当天工时；点击任意日期可查看该日记录。", color = Muted, fontSize = 11.sp)
                     }
                 }
+            } else if (showProfile) {
+                val backgrounds = listOf(Color(0xFFF2F0FF), Color(0xFFEAF7F4), Color(0xFFFFF1E8), Color(0xFFEAF2FF))
+                Column(Modifier.fillMaxSize().padding(padding).background(backgrounds[profileBackground.coerceIn(0, 3)]).verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { showProfile = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回打卡") }
+                        Spacer(Modifier.weight(1f)); Icon(Icons.Default.AutoAwesome, null, tint = Blue)
+                    }
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.94f))) {
+                        Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(Modifier.size(124.dp).background(Color(0xFFE5E9FF), CircleShape).clickable { avatarPicker.launch("image/*") }, contentAlignment = Alignment.Center) {
+                                if (profileAvatar != null) Image(profileAvatar!!.asImageBitmap(), "个人头像", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                else Icon(Icons.Default.AccountCircle, null, tint = Blue, modifier = Modifier.size(100.dp))
+                                Surface(Modifier.align(Alignment.BottomEnd), shape = CircleShape, color = Blue) { Icon(Icons.Default.CameraAlt, null, tint = Color.White, modifier = Modifier.padding(7.dp).size(18.dp)) }
+                            }
+                            Text(profileName.ifBlank { employeeName }, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, color = Ink)
+                            Text("个人空间 · " + if (role == "admin") "管理员" else "员工", color = Muted, fontSize = 13.sp)
+                            Text("工号：" + employeeId, color = Blue, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                            OutlinedTextField(profileName, { profileName = it }, label = { Text("姓名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("性别", color = Muted)
+                                listOf("男", "女", "未设置").forEach { g -> FilterChip(selected = profileGender == g, onClick = { profileGender = g }, label = { Text(g) }) }
+                            }
+                            OutlinedTextField(profileAge, { profileAge = it.filter(Char::isDigit).take(3) }, label = { Text("年龄") }, suffix = { Text("岁") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            Text("页面背景", color = Ink, fontWeight = FontWeight.SemiBold)
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                backgrounds.forEachIndexed { i, c -> Box(Modifier.weight(1f).height(42.dp).background(c, RoundedCornerShape(12.dp)).clickable { profileBackground = i }, contentAlignment = Alignment.Center) { if (profileBackground == i) Icon(Icons.Default.CheckCircle, null, tint = Blue) } }
+                            }
+                            Button(enabled = !profileLoading && profileName.isNotBlank() && (profileAge.isBlank() || (profileAge.toIntOrNull() ?: 999) <= 120), onClick = {
+                                scope.launch {
+                                    profileLoading = true
+                                    try {
+                                        val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                        store.writeProfileAsync(ProfileData(employeeId, profileName.trim(), profileGender, profileAge, "profiles/avatars/" + employeeId + ".jpg", profileBackground))
+                                        prefs.edit().putString("name", profileName.trim()).putInt("profile_background", profileBackground).apply()
+                                        employeeName = profileName.trim()
+                                        profileMessage = "个人资料已保存到 R2。"
+                                    } catch (e: Exception) { profileMessage = "保存失败：" + (e.message ?: e.javaClass.simpleName) }
+                                    finally { profileLoading = false }
+                                }
+                            }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text(if (profileLoading) "保存中…" else "保存个人资料") }
+                            OutlinedButton(enabled = !profileLoading, onClick = { avatarPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.AddAPhoto, null); Spacer(Modifier.width(8.dp)); Text("上传/更换头像（保存至 R2）") }
+                            if (profileMessage.isNotBlank()) Text(profileMessage, color = Blue, fontSize = 13.sp)
+                        }
+                    }
+                    Text("轻松工作，自信生活 ✨", color = Muted, fontSize = 12.sp)
+                }
             } else if (showMakeUpRecords && role == "admin") {
                 val recordGroups = makeUpQueryPunches
                     .filter { it.employeeId.let { id -> makeUpQueryEmployee.isBlank() || id == makeUpQueryEmployee } }
@@ -837,7 +920,24 @@ fun WorkClockApp(context: Context) {
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { _, amount -> drag += amount },
                         onDragEnd = {
-                            if (role == "admin" && drag < -70f) {
+                            if (drag > 70f && loggedIn) {
+                                showProfile = true
+                                profileName = employeeName
+                                scope.launch {
+                                    profileLoading = true
+                                    try {
+                                        val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                        val data = store.readProfileAsync(employeeId)
+                                        profileName = data?.name?.ifBlank { employeeName } ?: employeeName
+                                        profileGender = data?.gender ?: "未设置"
+                                        profileAge = data?.age ?: ""
+                                        profileBackground = data?.background ?: prefs.getInt("profile_background", 0)
+                                        val bytes = store.readBinaryAsync(data?.avatarKey ?: "profiles/avatars/" + employeeId + ".jpg")
+                                        if (bytes != null) profileAvatar = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                    } catch (e: Exception) { profileMessage = "读取个人资料失败：" + (e.message ?: e.javaClass.simpleName) }
+                                    finally { profileLoading = false }
+                                }
+                            } else if (role == "admin" && drag < -70f) {
                                 showAdminSummary = true
                                 scope.launch {
                                     summaryLoading = true
@@ -858,6 +958,7 @@ fun WorkClockApp(context: Context) {
                     )
                 }, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     item {
+                        if (loggedIn) Text("向右滑动，进入个人空间 ✨", color = Muted, fontSize = 11.sp)
                         if (message.isNotBlank()) {
                             Card(
                                 modifier = Modifier.fillMaxWidth().clickable { hintExpanded = !hintExpanded },
