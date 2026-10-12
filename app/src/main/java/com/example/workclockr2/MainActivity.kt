@@ -346,6 +346,10 @@ fun WorkClockApp(context: Context) {
                                     }
                                 }
                                 if (connectionTest.isNotBlank()) Text(connectionTest, color = if (connectionTest.startsWith("连接成功")) Color(0xFF16865C) else Blue, fontSize = 12.sp)
+                                prefs.getString("last_punch_error", null)?.let { savedError ->
+                                    Text("上次打卡诊断（可复制反馈）：$savedError", color = Color(0xFFD34B54), fontSize = 11.sp)
+                                    prefs.getString("last_punch_error_time", null)?.let { Text("错误时间：$it", color = Muted, fontSize = 10.sp) }
+                                }
                             }
                             1 -> {
                                 Text("修改管理员密码", color = Ink, fontWeight = FontWeight.Bold)
