@@ -370,19 +370,38 @@ fun WorkClockApp(context: Context) {
         }
     }
 
-    MaterialTheme(colorScheme = lightColorScheme(primary = Blue, background = Color(0xFFF4F7FC), surface = Color.White)) {
-        Scaffold(containerColor = Color(0xFFF4F7FC), topBar = {
+    var darkMode by remember { mutableStateOf(prefs.getBoolean("dark_mode", false)) }
+    val themeBackground = if (darkMode) Color(0xFF101820) else themeBackground
+    val themeSurface = if (darkMode) Color(0xFF1B2632) else Color.White
+    val themeInk = if (darkMode) Color(0xFFE7EDF5) else Ink
+    val themeMuted = if (darkMode) Color(0xFFA8B5C5) else Muted
+    val themeScheme = if (darkMode) darkColorScheme(
+        primary = Color(0xFF79AFFF),
+        onPrimary = Color(0xFF082044),
+        background = themeBackground,
+        surface = themeSurface,
+        onSurface = themeInk
+    ) else lightColorScheme(primary = Blue, background = themeBackground, surface = themeSurface, onSurface = themeInk)
+
+    MaterialTheme(colorScheme = themeScheme) {
+        Scaffold(containerColor = themeBackground, topBar = {
             TopAppBar(title = {
                 Column {
-                    Text("上班打卡", fontWeight = FontWeight.Bold, color = Ink)
-                    Text(if (loggedIn) "$employeeName · $employeeId" else "考勤工作台", fontSize = 12.sp, color = Muted)
+                    Text("上班打卡", fontWeight = FontWeight.Bold, color = themeInk)
+                    Text(if (loggedIn) "$employeeName · $employeeId" else "考勤工作台", fontSize = 12.sp, color = themeMuted)
                 }
             }, actions = {
+                IconButton(onClick = {
+                    darkMode = !darkMode
+                    prefs.edit().putBoolean("dark_mode", darkMode).apply()
+                }) {
+                    Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, if (darkMode) "切换白天模式" else "切换黑夜模式")
+                }
                 IconButton(onClick = { if (role == "admin" && loggedIn) { configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = ""; configAuthMessage = "" }; showSettings = true }) { Icon(Icons.Default.Settings, "设置") }
-            }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF4F7FC)))
+            }, colors = TopAppBarDefaults.topAppBarColors(containerColor = themeBackground))
         }, bottomBar = {
             if (loggedIn && !needChangePassword && !showAdminSummary && configured) {
-                Surface(shadowElevation = 8.dp, color = Color.White) {
+                Surface(shadowElevation = 8.dp, color = themeSurface) {
                     OutlinedButton(
                         onClick = {
                             loggedIn = false
@@ -406,15 +425,15 @@ fun WorkClockApp(context: Context) {
                 Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center) {
                     Icon(Icons.Default.CloudOff, null, tint = Blue, modifier = Modifier.size(52.dp))
                     Spacer(Modifier.height(12.dp))
-                    Text("首次使用，请配置 Cloudflare R2", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Ink)
-                    Text("未完成配置前，登录和打卡功能均不可用。", color = Muted)
+                    Text("首次使用，请配置 Cloudflare R2", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = themeInk)
+                    Text("未完成配置前，登录和打卡功能均不可用。", color = themeMuted)
                     Spacer(Modifier.height(20.dp))
                     Button(onClick = { showSettings = true }, modifier = Modifier.fillMaxWidth()) { Text("配置 R2") }
                 }
             } else if (!loggedIn) {
                 Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center) {
-                    Text("欢迎回来", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Ink)
-                    Text("请使用管理员分配的六位工号登录", color = Muted)
+                    Text("欢迎回来", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = themeInk)
+                    Text("请使用管理员分配的六位工号登录", color = themeMuted)
                     Spacer(Modifier.height(22.dp))
                     OutlinedTextField(loginId, { loginId = it.filter(Char::isDigit).take(6) }, label = { Text("六位工号") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     OutlinedTextField(loginPassword, { loginPassword = it }, label = { Text("密码") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
@@ -459,8 +478,8 @@ fun WorkClockApp(context: Context) {
                 }
             } else if (needChangePassword) {
                 Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center) {
-                    Text("设置新密码", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Ink)
-                    Text("首次登录请修改密码。", color = Muted)
+                    Text("设置新密码", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = themeInk)
+                    Text("首次登录请修改密码。", color = themeMuted)
                     Spacer(Modifier.height(16.dp))
                     OutlinedTextField(newPassword, { newPassword = it }, label = { Text("新密码（至少 6 位）") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     OutlinedTextField(confirmPassword, { confirmPassword = it }, label = { Text("确认新密码") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
@@ -500,53 +519,53 @@ fun WorkClockApp(context: Context) {
                         }
                         Spacer(Modifier.width(8.dp))
                         Column {
-                            Text(emp.displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Ink)
-                            Text("${emp.employeeId} · ${if (emp.role == "admin") "管理员" else "员工"} · 本月报表", color = Muted, fontSize = 12.sp)
+                            Text(emp.displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = themeInk)
+                            Text("${emp.employeeId} · ${if (emp.role == "admin") "管理员" else "员工"} · 本月报表", color = themeMuted, fontSize = 12.sp)
                         }
                     }
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = themeSurface)) {
                             Column(Modifier.padding(14.dp)) {
-                                Text("本月总工时", color = Muted, fontSize = 12.sp)
+                                Text("本月总工时", color = themeMuted, fontSize = 12.sp)
                                 Text(String.format("%.2f 小时", empTotalHours), color = Blue, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                             }
                         }
-                        Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = themeSurface)) {
                             Column(Modifier.padding(14.dp)) {
-                                Text("打卡天数 / 次数", color = Muted, fontSize = 12.sp)
-                                Text("${empDays.size} 天 / ${empPunches.size} 次", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text("打卡天数 / 次数", color = themeMuted, fontSize = 12.sp)
+                                Text("${empDays.size} 天 / ${empPunches.size} 次", color = themeInk, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             }
                         }
                     }
                     Spacer(Modifier.height(12.dp))
                     if (selectedSummaryDay != null) {
-                        Text(selectedSummaryDay!!, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(selectedSummaryDay!!, color = themeInk, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Text("当日工时：${String.format("%.2f", calculateHours(selectedDayPunches))} 小时", color = Blue, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
                         if (selectedDayPunches.isEmpty()) {
-                            Text("当天没有打卡记录", color = Muted, modifier = Modifier.padding(vertical = 12.dp))
+                            Text("当天没有打卡记录", color = themeMuted, modifier = Modifier.padding(vertical = 12.dp))
                         } else {
                             LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 items(selectedDayPunches) { punch ->
-                                    Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(12.dp)) {
+                                    Card(colors = CardDefaults.cardColors(containerColor = themeSurface), shape = RoundedCornerShape(12.dp)) {
                                         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Text(when (punch.type) { "IN" -> "上班打卡"; "OUT" -> "下班打卡"; else -> "临时下班" },
-                                                color = Ink, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                                            Text(punch.at.replace("T", " ").take(19), color = Muted, fontSize = 13.sp)
+                                                color = themeInk, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                            Text(punch.at.replace("T", " ").take(19), color = themeMuted, fontSize = 13.sp)
                                         }
                                     }
                                 }
                             }
                         }
                     } else {
-                        Text("月度日历 · 点击日期查看打卡明细", color = Ink, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                        Text("${reportMonth.year}年${reportMonth.monthValue}月", color = Muted, fontSize = 13.sp)
+                        Text("月度日历 · 点击日期查看打卡明细", color = themeInk, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                        Text("${reportMonth.year}年${reportMonth.monthValue}月", color = themeMuted, fontSize = 13.sp)
                         Spacer(Modifier.height(8.dp))
                         Row(Modifier.fillMaxWidth()) {
                             listOf("一", "二", "三", "四", "五", "六", "日").forEach { weekday ->
                                 Text(weekday, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                    color = themeMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                             }
                         }
                         Spacer(Modifier.height(4.dp))
@@ -563,12 +582,12 @@ fun WorkClockApp(context: Context) {
                                             val hasPunch = dayItems.isNotEmpty()
                                             Card(
                                                 modifier = Modifier.weight(1f).height(66.dp).clickable { selectedSummaryDay = dayKey },
-                                                colors = CardDefaults.cardColors(containerColor = if (hasPunch) Color(0xFFEAF2FF) else Color.White),
+                                                colors = CardDefaults.cardColors(containerColor = if (hasPunch) Color(0xFFEAF2FF) else themeSurface),
                                                 shape = RoundedCornerShape(8.dp)
                                             ) {
                                                 Column(Modifier.fillMaxSize().padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally,
                                                     verticalArrangement = Arrangement.Center) {
-                                                    Text(date.dayOfMonth.toString(), color = if (hasPunch) Blue else Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                    Text(date.dayOfMonth.toString(), color = if (hasPunch) Blue else themeInk, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                                     if (hasPunch) Text(String.format("%.1f小时", dayHours), color = Blue, fontSize = 9.sp, maxLines = 1)
                                                 }
                                             }
@@ -578,7 +597,7 @@ fun WorkClockApp(context: Context) {
                                 }
                             }
                         }
-                        Text("有打卡记录的日期会显示当天工时；点击任意日期可查看该日记录。", color = Muted, fontSize = 11.sp)
+                        Text("有打卡记录的日期会显示当天工时；点击任意日期可查看该日记录。", color = themeMuted, fontSize = 11.sp)
                     }
                 }
             } else if (showProfile) {
@@ -588,28 +607,28 @@ fun WorkClockApp(context: Context) {
                         TextButton(onClick = { showProfile = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回打卡") }
                         Spacer(Modifier.weight(1f)); Icon(Icons.Default.AutoAwesome, null, tint = Blue)
                     }
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.94f))) {
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = themeSurface.copy(alpha = 0.94f))) {
                         Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Box(Modifier.size(124.dp).background(Color(0xFFE5E9FF), CircleShape).clickable { avatarPicker.launch("image/*") }, contentAlignment = Alignment.Center) {
                                 if (profileAvatar != null) Image(profileAvatar!!.asImageBitmap(), "个人头像", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                                 else Icon(Icons.Default.AccountCircle, null, tint = Blue, modifier = Modifier.size(100.dp))
-                                Surface(Modifier.align(Alignment.BottomEnd), shape = CircleShape, color = Blue) { Icon(Icons.Default.CameraAlt, null, tint = Color.White, modifier = Modifier.padding(7.dp).size(18.dp)) }
+                                Surface(Modifier.align(Alignment.BottomEnd), shape = CircleShape, color = Blue) { Icon(Icons.Default.CameraAlt, null, tint = themeSurface, modifier = Modifier.padding(7.dp).size(18.dp)) }
                             }
-                            Text(profileName.ifBlank { employeeName }, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, color = Ink)
-                            Text("个人空间 · " + if (role == "admin") "管理员" else "员工", color = Muted, fontSize = 13.sp)
+                            Text(profileName.ifBlank { employeeName }, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, color = themeInk)
+                            Text("个人空间 · " + if (role == "admin") "管理员" else "员工", color = themeMuted, fontSize = 13.sp)
                             Text("工号：" + employeeId, color = Blue, fontWeight = FontWeight.Medium)
                         }
                     }
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = themeSurface)) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                            Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = themeInk)
                             OutlinedTextField(profileName, { profileName = it }, label = { Text("姓名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("性别", color = Muted)
+                                Text("性别", color = themeMuted)
                                 listOf("男", "女", "未设置").forEach { g -> FilterChip(selected = profileGender == g, onClick = { profileGender = g }, label = { Text(g) }) }
                             }
                             OutlinedTextField(profileAge, { profileAge = it.filter(Char::isDigit).take(3) }, label = { Text("年龄") }, suffix = { Text("岁") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            Text("页面背景", color = Ink, fontWeight = FontWeight.SemiBold)
+                            Text("页面背景", color = themeInk, fontWeight = FontWeight.SemiBold)
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 backgrounds.forEachIndexed { i, c -> Box(Modifier.weight(1f).height(42.dp).background(c, RoundedCornerShape(12.dp)).clickable { profileBackground = i }, contentAlignment = Alignment.Center) { if (profileBackground == i) Icon(Icons.Default.CheckCircle, null, tint = Blue) } }
                             }
@@ -630,7 +649,7 @@ fun WorkClockApp(context: Context) {
                             if (profileMessage.isNotBlank()) Text(profileMessage, color = Blue, fontSize = 13.sp)
                         }
                     }
-                    Text("轻松工作，自信生活 ✨", color = Muted, fontSize = 12.sp)
+                    Text("轻松工作，自信生活 ✨", color = themeMuted, fontSize = 12.sp)
                 }
             } else if (showMakeUpRecords && role == "admin") {
                 val recordGroups = makeUpQueryPunches
@@ -649,9 +668,9 @@ fun WorkClockApp(context: Context) {
                             Icon(Icons.Default.ArrowBack, null); Text("返回全员")
                         }
                         Spacer(Modifier.width(8.dp))
-                        Text("补班记录", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Ink)
+                        Text("补班记录", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = themeInk)
                     }
-                    Text("可按员工和日期范围查询；修改或删除会同步更新考勤记录。", color = Muted, fontSize = 12.sp)
+                    Text("可按员工和日期范围查询；修改或删除会同步更新考勤记录。", color = themeMuted, fontSize = 12.sp)
                     Spacer(Modifier.height(8.dp))
                     var employeeFilterExpanded by remember { mutableStateOf(false) }
                     Box {
@@ -698,13 +717,13 @@ fun WorkClockApp(context: Context) {
                         Icon(Icons.Default.Search, null); Spacer(Modifier.width(6.dp)); Text(if (summaryLoading) "查询中…" else "查询")
                     }
                     if (summaryError.isNotBlank()) Text(summaryError, color = Color(0xFFD34B54), fontSize = 12.sp)
-                    Text("查询到 ${recordGroups.size} 个补班时间段", color = Muted, fontSize = 12.sp)
+                    Text("查询到 ${recordGroups.size} 个补班时间段", color = themeMuted, fontSize = 12.sp)
                     LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(recordGroups, key = { it.first }) { (groupId, start, end) ->
                             val emp = summaryEmployees.firstOrNull { it.employeeId == start.employeeId }
-                            Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(14.dp)) {
+                            Card(colors = CardDefaults.cardColors(containerColor = themeSurface), shape = RoundedCornerShape(14.dp)) {
                                 Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                                    Text("${emp?.displayName ?: start.employeeId}（${start.employeeId}）", color = Ink, fontWeight = FontWeight.Bold)
+                                    Text("${emp?.displayName ?: start.employeeId}（${start.employeeId}）", color = themeInk, fontWeight = FontWeight.Bold)
                                     Text("${start.day} · ${runCatching { ZonedDateTime.parse(start.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault(start.at.takeLast(8).take(5))} - ${runCatching { ZonedDateTime.parse(end.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault(end.at.takeLast(8).take(5))}", color = Blue, fontWeight = FontWeight.Medium)
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         TextButton(onClick = {
@@ -720,7 +739,7 @@ fun WorkClockApp(context: Context) {
                             }
                         }
                     }
-                    if (recordGroups.isEmpty() && !summaryLoading) Text("当前条件没有补班记录。", color = Muted, modifier = Modifier.padding(vertical = 12.dp))
+                    if (recordGroups.isEmpty() && !summaryLoading) Text("当前条件没有补班记录。", color = themeMuted, modifier = Modifier.padding(vertical = 12.dp))
                 }
                 if (pendingDeleteMakeUp != null) {
                     val (deleteStart, deleteEnd) = pendingDeleteMakeUp!!
@@ -765,7 +784,7 @@ fun WorkClockApp(context: Context) {
                         title = { Text("修改补班记录") },
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(summaryEmployees.firstOrNull { it.employeeId == makeUpEmployeeId }?.let { "${it.displayName}（${it.employeeId}）" } ?: makeUpEmployeeId, color = Muted)
+                                Text(summaryEmployees.firstOrNull { it.employeeId == makeUpEmployeeId }?.let { "${it.displayName}（${it.employeeId}）" } ?: makeUpEmployeeId, color = themeMuted)
                                 OutlinedTextField(value = editingMakeUpDate, onValueChange = {}, readOnly = true, label = { Text("补班日期") }, trailingIcon = { IconButton(onClick = { showEditDatePicker = true }) { Icon(Icons.Default.CalendarMonth, null) } }, modifier = Modifier.fillMaxWidth().clickable { showEditDatePicker = true })
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     OutlinedTextField(value = editingMakeUpStart, onValueChange = {}, readOnly = true, label = { Text("开始时间") }, trailingIcon = { IconButton(onClick = { showEditStartPicker = true }) { Icon(Icons.Default.AccessTime, null) } }, modifier = Modifier.weight(1f).clickable { showEditStartPicker = true })
@@ -825,8 +844,8 @@ fun WorkClockApp(context: Context) {
                 }.padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
-                            Text("全员打卡合计", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Ink)
-                            Text(today.format(DateTimeFormatter.ofPattern("yyyy年MM月")) + " · 本月累计工时", color = Muted, fontSize = 13.sp)
+                            Text("全员打卡合计", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = themeInk)
+                            Text(today.format(DateTimeFormatter.ofPattern("yyyy年MM月")) + " · 本月累计工时", color = themeMuted, fontSize = 13.sp)
                         }
                         TextButton(onClick = { showAdminSummary = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回") }
                     }
@@ -871,21 +890,21 @@ fun WorkClockApp(context: Context) {
                     val totalHours = summaryEmployees.sumOf { emp ->
                         calculateHours(summaryPunches.filter { it.employeeId == emp.employeeId && it.day.startsWith(monthKey) })
                     }
-                    Card(Modifier.fillMaxWidth().padding(top = 10.dp), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Card(Modifier.fillMaxWidth().padding(top = 10.dp), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = themeSurface)) {
                         Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column {
-                                Text("全员累计工时", color = Muted, fontSize = 13.sp)
+                                Text("全员累计工时", color = themeMuted, fontSize = 13.sp)
                                 Text(String.format("%.2f 小时", totalHours), color = Blue, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                Text("员工人数", color = Muted, fontSize = 13.sp)
-                                Text("${summaryEmployees.size}", color = Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                                Text("员工人数", color = themeMuted, fontSize = 13.sp)
+                                Text("${summaryEmployees.size}", color = themeInk, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                     Spacer(Modifier.height(12.dp))
                     if (summaryEmployees.isEmpty() && !summaryLoading && summaryError.isBlank()) {
-                        Text("点击“刷新全员数据”读取 R2 中的员工和考勤记录。", color = Muted, modifier = Modifier.padding(top = 18.dp))
+                        Text("点击“刷新全员数据”读取 R2 中的员工和考勤记录。", color = themeMuted, modifier = Modifier.padding(top = 18.dp))
                     } else {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             items(summaryEmployees.size) { index ->
@@ -894,26 +913,26 @@ fun WorkClockApp(context: Context) {
                                 Card(
                                     modifier = Modifier.fillMaxWidth().clickable { selectedSummaryEmployee = emp },
                                     shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                                    colors = CardDefaults.cardColors(containerColor = themeSurface)
                                 ) {
                                     Column(Modifier.fillMaxWidth().padding(16.dp)) {
                                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                             Column(Modifier.weight(1f)) {
-                                                Text(emp.displayName, color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                                Text("${emp.employeeId} · ${if (emp.role == "admin") "管理员" else "员工"}", color = Muted, fontSize = 12.sp)
+                                                Text(emp.displayName, color = themeInk, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                Text("${emp.employeeId} · ${if (emp.role == "admin") "管理员" else "员工"}", color = themeMuted, fontSize = 12.sp)
                                             }
                                             Column(horizontalAlignment = Alignment.End) {
                                                 Text(String.format("%.2f 小时", calculateHours(empPunches)), color = Blue, fontWeight = FontWeight.Bold)
                                                 Text("查看报表 ›", color = Blue, fontSize = 11.sp)
                                             }
                                         }
-                                        Text("打卡 ${empPunches.size} 次 · ${empPunches.map { it.day }.distinct().size} 天", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                                        Text("打卡 ${empPunches.size} 次 · ${empPunches.map { it.day }.distinct().size} 天", color = themeMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                                     }
                                 }
                             }
                         }
                     }
-                    Text("向右滑动返回打卡页面", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                    Text("向右滑动返回打卡页面", color = themeMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                 }
             } else {
                 LazyColumn(Modifier.fillMaxSize().padding(padding).pointerInput(role) {
@@ -959,12 +978,12 @@ fun WorkClockApp(context: Context) {
                     )
                 }, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     item {
-                        if (loggedIn) Text("向右滑动，进入个人空间 ✨", color = Muted, fontSize = 11.sp)
+                        if (loggedIn) Text("向右滑动，进入个人空间 ✨", color = themeMuted, fontSize = 11.sp)
                         if (message.isNotBlank()) {
                             Card(
                                 modifier = Modifier.fillMaxWidth().clickable { hintExpanded = !hintExpanded },
                                 shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White)
+                                colors = CardDefaults.cardColors(containerColor = themeSurface)
                             ) {
                                 Row(Modifier.fillMaxWidth().heightIn(min = 16.dp).padding(horizontal = 8.dp, vertical = if (hintExpanded) 8.dp else 0.dp),
                                     verticalAlignment = Alignment.CenterVertically) {
@@ -975,7 +994,7 @@ fun WorkClockApp(context: Context) {
                                         maxLines = if (hintExpanded) Int.MAX_VALUE else 1,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    Icon(if (hintExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = if (hintExpanded) "收起提示" else "展开提示", tint = Muted, modifier = Modifier.size(16.dp))
+                                    Icon(if (hintExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = if (hintExpanded) "收起提示" else "展开提示", tint = themeMuted, modifier = Modifier.size(16.dp))
                                 }
                             }
                         }
@@ -1007,31 +1026,31 @@ fun WorkClockApp(context: Context) {
                                     .clickable(enabled = !busy) { doPunch(if (active) "OUT" else "IN") },
                                     contentAlignment = Alignment.Center) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(if (active) Icons.Default.Logout else Icons.Default.Fingerprint, null, tint = Color.White, modifier = Modifier.size(46.dp))
+                                        Icon(if (active) Icons.Default.Logout else Icons.Default.Fingerprint, null, tint = themeSurface, modifier = Modifier.size(46.dp))
                                         Spacer(Modifier.height(8.dp))
-                                        Text(if (active) "下班打卡" else "上班打卡", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                                        Text(if (busy) "正在同步…" else "点击记录时间", color = Color.White.copy(alpha = .85f), fontSize = 12.sp)
+                                        Text(if (active) "下班打卡" else "上班打卡", color = themeSurface, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                                        Text(if (busy) "正在同步…" else "点击记录时间", color = themeSurface.copy(alpha = .85f), fontSize = 12.sp)
                                     }
                                 }
                                 Spacer(Modifier.height(10.dp))
-                                Text(status, color = Muted)
+                                Text(status, color = themeMuted)
                             }
                         }
                     }
                     item {
-                        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = themeSurface)) {
                             Column(Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                     Text(
                                         if (showMonthCalendar) "本月打卡" else "本周打卡",
                                         fontSize = 18.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Ink,
+                                        color = themeInk,
                                         modifier = Modifier.clickable { showMonthCalendar = !showMonthCalendar }
                                     )
                                     Text(
                                         today.format(DateTimeFormatter.ofPattern("yyyy年MM月")) + " · 点击标题切换",
-                                        color = Muted,
+                                        color = themeMuted,
                                         fontSize = 11.sp,
                                         modifier = Modifier.clickable { showMonthCalendar = !showMonthCalendar }
                                     )
@@ -1047,13 +1066,13 @@ fun WorkClockApp(context: Context) {
                                 val displayedDays = if (showMonthCalendar) (1..monthDays).map { monthFirst.withDayOfMonth(it) } else (0..6).map { monday.plusDays(it.toLong()) }
                                 val displayedTotalHours = displayedDays.sumOf { d -> calculateHours(punchList.filter { it.day == d.toString() }) }
                                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Text(if (showMonthCalendar) "本月总工时" else "本周总工时", color = Muted, fontSize = 13.sp)
+                                    Text(if (showMonthCalendar) "本月总工时" else "本周总工时", color = themeMuted, fontSize = 13.sp)
                                     Text(String.format("%.2f 小时", displayedTotalHours), color = Blue, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                                 }
                                 if (showMonthCalendar) {
                                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                                         listOf("一","二","三","四","五","六","日").forEach { dayName ->
-                                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Text(dayName, color = Muted, fontSize = 10.sp) }
+                                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Text(dayName, color = themeMuted, fontSize = 10.sp) }
                                         }
                                     }
                                     (0 until calendarWeeks).forEach { week ->
@@ -1070,15 +1089,15 @@ fun WorkClockApp(context: Context) {
                                                             .clickable { selectedDay = d }.padding(vertical = 5.dp),
                                                         horizontalAlignment = Alignment.CenterHorizontally
                                                     ) {
-                                                        Text(d.dayOfMonth.toString(), color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                        Text(d.dayOfMonth.toString(), color = themeInk, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                                         Spacer(Modifier.height(2.dp))
-                                                        Text(if (has) String.format("%.1f", dayHours) else "—", color = if (has) Blue else Muted, fontSize = 9.sp, maxLines = 1)
+                                                        Text(if (has) String.format("%.1f", dayHours) else "—", color = if (has) Blue else themeMuted, fontSize = 9.sp, maxLines = 1)
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                    Text("日期下方为当天工时（小时），点击日期查看打卡明细。", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
+                                    Text("日期下方为当天工时（小时），点击日期查看打卡明细。", color = themeMuted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
                                 } else {
                                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                                         (0..6).forEach { offset ->
@@ -1087,29 +1106,29 @@ fun WorkClockApp(context: Context) {
                                             val has = punchList.any { it.day == d.toString() }
                                             Column(Modifier.weight(1f).background(if (d == selectedDay) Color(0xFFE5EEFF) else Color.Transparent, RoundedCornerShape(10.dp))
                                                 .clickable { selectedDay = d }.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(listOf("一","二","三","四","五","六","日")[offset], color = Muted, fontSize = 10.sp)
+                                                Text(listOf("一","二","三","四","五","六","日")[offset], color = themeMuted, fontSize = 10.sp)
                                                 Spacer(Modifier.height(4.dp))
-                                                Text(d.dayOfMonth.toString(), color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                Text(d.dayOfMonth.toString(), color = themeInk, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                                 Spacer(Modifier.height(3.dp))
-                                                Text(if (has) String.format("%.1f", dayHours) else "—", color = if (has) Blue else Muted, fontSize = 9.sp, maxLines = 1)
+                                                Text(if (has) String.format("%.1f", dayHours) else "—", color = if (has) Blue else themeMuted, fontSize = 9.sp, maxLines = 1)
                                             }
                                         }
                                     }
-                                    Text("日期下方为当天工时（小时）。", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
+                                    Text("日期下方为当天工时（小时）。", color = themeMuted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
                                 }
                             }
                         }
                     }
                     item {
-                        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = themeSurface)) {
                             Column(Modifier.padding(16.dp)) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Text("${selectedDay.monthValue}月${selectedDay.dayOfMonth}日 · 打卡明细", fontWeight = FontWeight.Bold, color = Ink)
+                                    Text("${selectedDay.monthValue}月${selectedDay.dayOfMonth}日 · 打卡明细", fontWeight = FontWeight.Bold, color = themeInk)
                                     Text("${"%.2f".format(hours)} 小时", color = Blue, fontWeight = FontWeight.Bold)
                                 }
                                 Spacer(Modifier.height(10.dp))
                                 if (dayPunches.isEmpty()) {
-                                    Text("当天暂无打卡记录", color = Muted, modifier = Modifier.padding(vertical = 16.dp))
+                                    Text("当天暂无打卡记录", color = themeMuted, modifier = Modifier.padding(vertical = 16.dp))
                                 } else {
                                     LazyColumn(
                                         modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
@@ -1120,10 +1139,10 @@ fun WorkClockApp(context: Context) {
                                                 Icon(Icons.Default.Circle, null, tint = when(p.type) { "IN" -> Color(0xFF16A36A); "OUT" -> Color(0xFFDB5864); else -> Color(0xFFED9A32) }, modifier = Modifier.size(10.dp))
                                                 Spacer(Modifier.width(10.dp))
                                                 Column(Modifier.weight(1f)) {
-                                                    Text(when(p.type) { "IN" -> "上班打卡"; "OUT" -> "下班打卡"; else -> "临时下班" }, color = Ink, fontWeight = FontWeight.Medium)
-                                                    Text(p.at.replace("T", " ").take(19), color = Muted, fontSize = 12.sp)
+                                                    Text(when(p.type) { "IN" -> "上班打卡"; "OUT" -> "下班打卡"; else -> "临时下班" }, color = themeInk, fontWeight = FontWeight.Medium)
+                                                    Text(p.at.replace("T", " ").take(19), color = themeMuted, fontSize = 12.sp)
                                                 }
-                                                Text(when(p.type) { "IN" -> "开始"; "OUT" -> "结束"; else -> "结算区间" }, color = Muted, fontSize = 12.sp)
+                                                Text(when(p.type) { "IN" -> "开始"; "OUT" -> "结束"; else -> "结算区间" }, color = themeMuted, fontSize = 12.sp)
                                             }
                                             HorizontalDivider(color = Color(0xFFF0F3F8))
                                         }
@@ -1142,7 +1161,7 @@ fun WorkClockApp(context: Context) {
                 title = { Text("管理员补班") },
                 text = {
                     Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("选择员工、日期和一个或多个补班时间段。每个时间段会生成一条上班和一条下班记录。", color = Muted, fontSize = 12.sp)
+                        Text("选择员工、日期和一个或多个补班时间段。每个时间段会生成一条上班和一条下班记录。", color = themeMuted, fontSize = 12.sp)
                         var employeeMenuExpanded by remember { mutableStateOf(false) }
                         Box {
                             OutlinedTextField(
@@ -1185,7 +1204,7 @@ fun WorkClockApp(context: Context) {
                             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFF0EAF5))) {
                                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text("时间段 ${index + 1}", fontWeight = FontWeight.Bold, color = Ink)
+                                        Text("时间段 ${index + 1}", fontWeight = FontWeight.Bold, color = themeInk)
                                         if (makeUpSegments.size > 1) TextButton(onClick = { makeUpSegments = makeUpSegments.filterIndexed { i, _ -> i != index } }) { Text("删除") }
                                     }
                                     var showStartTimePicker by remember(index) { mutableStateOf(false) }
@@ -1291,35 +1310,35 @@ fun WorkClockApp(context: Context) {
                             0 -> {
                                 if (role != "admin" || !loggedIn) {
                                     if (!qrConfigCompleted) {
-                                        Text("选择 R2 配置方式", color = Ink, fontWeight = FontWeight.Bold)
+                                        Text("选择 R2 配置方式", color = themeInk, fontWeight = FontWeight.Bold)
                                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                             FilterChip(selected = configMethod == "扫码配置", onClick = { configMethod = "扫码配置" }, label = { Text("扫码配置") })
                                             FilterChip(selected = configMethod == "手动配置", onClick = { configMethod = "手动配置" }, label = { Text("手动配置") })
                                         }
                                         if (configMethod == "扫码配置") {
-                                            Text("扫描管理员提供的 R2 配置二维码，内容需包含 account、access、secret，可选 ssid。", color = Muted, fontSize = 12.sp)
+                                            Text("扫描管理员提供的 R2 配置二维码，内容需包含 account、access、secret，可选 ssid。", color = themeMuted, fontSize = 12.sp)
                                             Button(onClick = { scanR2Qr() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.QrCodeScanner, null); Spacer(Modifier.width(8.dp)); Text("开始扫码") }
                                             if (qrScanMessage.isNotBlank()) Text(qrScanMessage, color = Blue, fontSize = 12.sp)
                                         }
                                     } else {
-                                        Text("扫码配置已完成，当前仅显示手动配置。", color = Muted, fontSize = 12.sp)
+                                        Text("扫码配置已完成，当前仅显示手动配置。", color = themeMuted, fontSize = 12.sp)
                                     }
                                 }
                                 if (restrictedUserSettings) {
-                                    Text("存储桶：workcloudr2（固定）", color = Ink, fontWeight = FontWeight.Medium)
-                                    Text("R2 配置由管理员统一管理。", color = Muted, fontSize = 12.sp)
+                                    Text("存储桶：workcloudr2（固定）", color = themeInk, fontWeight = FontWeight.Medium)
+                                    Text("R2 配置由管理员统一管理。", color = themeMuted, fontSize = 12.sp)
                                 } else if ((role != "admin" || !loggedIn) && configMethod != "手动配置") {
-                                    Text("请选择扫码配置或手动配置。", color = Muted, fontSize = 12.sp)
+                                    Text("请选择扫码配置或手动配置。", color = themeMuted, fontSize = 12.sp)
                                 } else if (hideR2Credentials) {
-                                    Text("存储桶：workcloudr2（固定）", color = Ink, fontWeight = FontWeight.Medium)
-                                    Text("R2 配置已隐藏。需要查看或修改时，请验证管理员密码。", color = Muted, fontSize = 12.sp)
+                                    Text("存储桶：workcloudr2（固定）", color = themeInk, fontWeight = FontWeight.Medium)
+                                    Text("R2 配置已隐藏。需要查看或修改时，请验证管理员密码。", color = themeMuted, fontSize = 12.sp)
                                     Button(onClick = { showAdminConfigAuth = true; adminConfigPassword = ""; configAuthMessage = "" }) {
                                         Text("输入管理员密码查看配置")
                                     }
                                 } else {
-                                    Text("R2 S3 API 凭据。桶固定为 workcloudr2。", color = Muted, fontSize = 12.sp)
+                                    Text("R2 S3 API 凭据。桶固定为 workcloudr2。", color = themeMuted, fontSize = 12.sp)
                                     OutlinedTextField(account, { account = it }, label = { Text("Account ID") }, singleLine = true)
-                                    Text("存储桶：workcloudr2（固定）", color = Ink, fontWeight = FontWeight.Medium)
+                                    Text("存储桶：workcloudr2（固定）", color = themeInk, fontWeight = FontWeight.Medium)
                                     OutlinedTextField(access, { access = it }, label = { Text("Access Key ID") }, singleLine = true)
                                     OutlinedTextField(secret, { secret = it }, label = { Text("Secret Access Key") }, singleLine = true)
                                     if (role == "admin" && loggedIn) {
@@ -1328,11 +1347,11 @@ fun WorkClockApp(context: Context) {
                                 }
                                 prefs.getString("last_punch_error", null)?.let { savedError ->
                                     Text("上次打卡诊断（可复制反馈）：$savedError", color = Color(0xFFD34B54), fontSize = 11.sp)
-                                    prefs.getString("last_punch_error_time", null)?.let { Text("错误时间：$it", color = Muted, fontSize = 10.sp) }
+                                    prefs.getString("last_punch_error_time", null)?.let { Text("错误时间：$it", color = themeMuted, fontSize = 10.sp) }
                                 }
                             }
                             1 -> {
-                                Text("修改管理员密码", color = Ink, fontWeight = FontWeight.Bold)
+                                Text("修改管理员密码", color = themeInk, fontWeight = FontWeight.Bold)
                                 OutlinedTextField(adminNewPassword, { adminNewPassword = it }, label = { Text("新密码（至少 6 位）") }, singleLine = true)
                                 OutlinedTextField(adminConfirmPassword, { adminConfirmPassword = it }, label = { Text("确认新密码") }, singleLine = true)
                                 Button(enabled = !busy && adminNewPassword.length >= 6 && adminNewPassword == adminConfirmPassword, onClick = {
@@ -1348,14 +1367,14 @@ fun WorkClockApp(context: Context) {
                                 }) { Text(if (busy) "保存中…" else "保存新密码") }
                             }
                             2 -> {
-                                Text("创建员工账号", color = Ink, fontWeight = FontWeight.Bold)
+                                Text("创建员工账号", color = themeInk, fontWeight = FontWeight.Bold)
                                 OutlinedTextField(createId, { createId = it.filter(Char::isDigit).take(6) }, label = { Text("六位工号") }, singleLine = true)
                                 OutlinedTextField(createName, { createName = it }, label = { Text("员工姓名") }, singleLine = true)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     FilterChip(selected = createRole == "employee", onClick = { createRole = "employee" }, label = { Text("普通员工") })
                                     FilterChip(selected = createRole == "admin", onClick = { createRole = "admin" }, label = { Text("管理员") })
                                 }
-                                Text("可输入 1–6 位数字，系统自动补足六位；初始密码为六位工号，首次登录需要修改。", color = Muted, fontSize = 12.sp)
+                                Text("可输入 1–6 位数字，系统自动补足六位；初始密码为六位工号，首次登录需要修改。", color = themeMuted, fontSize = 12.sp)
                                 Button(enabled = !creatingEmployee && createId.length in 1..6 && createId.all { it.isDigit() } && createName.isNotBlank(), onClick = {
                                     scope.launch {
                                         creatingEmployee = true
@@ -1401,7 +1420,7 @@ fun WorkClockApp(context: Context) {
                 title = { Text("管理员验证") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("输入管理员密码后，才能查看或修改 R2 配置。", color = Muted)
+                        Text("输入管理员密码后，才能查看或修改 R2 配置。", color = themeMuted)
                         OutlinedTextField(
                             value = adminConfigPassword,
                             onValueChange = { adminConfigPassword = it },
