@@ -87,6 +87,7 @@ fun WorkClockApp(context: Context) {
     var needChangePassword by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val configured = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()
+    val restrictedUserSettings = configured && loggedIn && role != "admin"
     val today = LocalDate.now()
     val fmt = DateTimeFormatter.ofPattern("HH:mm:ss")
     val dayPunches = punchList.filter { it.day == selectedDay.toString() }.sortedBy { it.at }
@@ -303,12 +304,19 @@ fun WorkClockApp(context: Context) {
                         }
                         when (if (role == "admin" && loggedIn) settingsPage else 0) {
                             0 -> {
-                                Text("R2 S3 API 凭据。桶固定为 workcloudr2。", color = Muted, fontSize = 12.sp)
-                                OutlinedTextField(account, { account = it }, label = { Text("Account ID") }, singleLine = true)
-                                Text("存储桶：workcloudr2（固定）", color = Ink, fontWeight = FontWeight.Medium)
-                                OutlinedTextField(access, { access = it }, label = { Text("Access Key ID") }, singleLine = true)
-                                OutlinedTextField(secret, { secret = it }, label = { Text("Secret Access Key") }, singleLine = true)
-                                OutlinedTextField(ssid, { ssid = it }, label = { Text("指定 WiFi 名称（可选）") }, singleLine = true)
+                                if (restrictedUserSettings) {
+                                    Text("存储桶：workcloudr2（固定）", color = Ink, fontWeight = FontWeight.Medium)
+                                    Text("R2 配置由管理员统一管理。", color = Muted, fontSize = 12.sp)
+                                } else {
+                                    Text("R2 S3 API 凭据。桶固定为 workcloudr2。", color = Muted, fontSize = 12.sp)
+                                    OutlinedTextField(account, { account = it }, label = { Text("Account ID") }, singleLine = true)
+                                    Text("存储桶：workcloudr2（固定）", color = Ink, fontWeight = FontWeight.Medium)
+                                    OutlinedTextField(access, { access = it }, label = { Text("Access Key ID") }, singleLine = true)
+                                    OutlinedTextField(secret, { secret = it }, label = { Text("Secret Access Key") }, singleLine = true)
+                                    if (role == "admin" && loggedIn || !loggedIn) {
+                                        OutlinedTextField(ssid, { ssid = it }, label = { Text("指定 WiFi 名称（可选）") }, singleLine = true)
+                                    }
+                                }
                                 if (connectionTest.isNotBlank()) Text(connectionTest, color = if (connectionTest.startsWith("连接成功")) Color(0xFF16865C) else Blue, fontSize = 12.sp)
                             }
                             1 -> {
@@ -353,7 +361,15 @@ fun WorkClockApp(context: Context) {
                         }
                     }
                 },
-                confirmButton = { if (settingsPage == 0 || role != "admin" || !loggedIn) Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") } else TextButton(onClick = { showSettings = false }) { Text("完成") } },
+                confirmButton = {
+                    if (restrictedUserSettings) {
+                        TextButton(onClick = { showSettings = false }) { Text("完成") }
+                    } else if (settingsPage == 0 || role != "admin" || !loggedIn) {
+                        Button(onClick = { saveConfig() }, enabled = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { Text("保存配置") }
+                    } else {
+                        TextButton(onClick = { showSettings = false }) { Text("完成") }
+                    }
+                },
                 dismissButton = {
                     Row {
                         if (settingsPage == 0 || role != "admin" || !loggedIn) TextButton(enabled = !testingConnection && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {
