@@ -127,19 +127,28 @@ fun WorkClockApp(context: Context) {
         }
         scope.launch {
             busy = true
+            message = "正在保存打卡记录…"
             try {
                 val cfg = R2Config(account, bucket, access, secret, ssid)
-                val store = R2Store(cfg)
-                val existing = store.readPunches(monthKey)
                 val now = ZonedDateTime.now().toString()
                 val punch = Punch(employeeId = employeeId, at = now, type = type, day = today.toString())
-                val merged = existing.filterNot { it.id == punch.id } + punch
-                store.writePunches(monthKey, merged)
-                punchList = merged.filter { it.employeeId == employeeId }
+                val saved = withContext(Dispatchers.IO) {
+                    val store = R2Store(cfg)
+                    val existing = store.readPunches(monthKey)
+                    val merged = existing.filterNot { it.id == punch.id } + punch
+                    store.writePunches(monthKey, merged)
+                    // Read-after-write verification: do not report success unless R2 returns this record.
+                    val confirmed = store.readPunches(monthKey)
+                    check(confirmed.any { it.id == punch.id }) {
+                        "写入请求已发送，但从 R2 重新读取后未找到本次记录"
+                    }
+                    confirmed
+                }
+                punchList = saved.filter { it.employeeId == employeeId }
                 status = when(type) { "IN" -> "已上班"; "OUT" -> "已下班"; else -> "临时下班已记录" }
-                message = "$status · ${ZonedDateTime.now().format(fmt)}"
+                message = "$status · 已保存并验证 · ${ZonedDateTime.now().format(fmt)}"
             } catch (e: Exception) {
-                message = "R2 操作失败：${e.message ?: "请检查配置与网络"}"
+                message = "打卡未确认保存：${e.message ?: "请检查 R2 配置与网络"}"
             } finally { busy = false }
         }
     }
