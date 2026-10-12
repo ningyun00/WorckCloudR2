@@ -158,34 +158,52 @@ fun WorkClockApp(context: Context) {
         prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2")
             .putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).apply()
         showSettings = false
-        message = "配置已保存。请先在 R2 上传 employees.json，然后登录。"
+        scope.launch {
+            if (ssid.isBlank()) {
+                message = "R2 连接配置已保存在本机。考勤 Wi-Fi 尚未设置，请管理员填写 Wi-Fi 名称后再次保存。"
+                return@launch
+            }
+            busy = true
+            try {
+                R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid.trim())).writeAllowedSsidAsync(ssid.trim())
+                message = "配置已保存。考勤 Wi-Fi 已写入 R2 的 app-config.json，所有员工设备将统一使用。请确认 employees.json 已上传。"
+            } catch (e: Exception) {
+                message = "本机 R2 配置已保存，但共享 Wi-Fi 写入失败：" + (e.message ?: e.javaClass.simpleName)
+            } finally { busy = false }
+        }
     }
     fun doPunch(type: String) {
         if (!configured) { showSettings = true; message = "请先完成 R2 配置"; return }
         if (!loggedIn) { message = "请先登录"; return }
-        if (ssid.isBlank()) {
-            message = "尚未设置考勤 Wi-Fi。请联系管理员配置指定 Wi-Fi 后再打卡。"
-            return
-        }
-        val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        if (!wm.isWifiEnabled) {
-            message = "Wi-Fi 验证失败：手机 Wi-Fi 未开启，请连接指定 Wi-Fi 后重试。"; return
-        }
-        @Suppress("DEPRECATION")
-        val current = runCatching { wm.connectionInfo?.ssid?.trim('"') }.getOrNull()
-        when {
-            current.isNullOrBlank() || current == "<unknown ssid>" -> {
-                message = "Wi-Fi 验证失败：Android 未向 App 提供当前 Wi-Fi 名称。请检查 App 的定位/附近 Wi-Fi 权限，并开启手机定位后重试。"; return
-            }
-            current != ssid.trim() -> {
-                message = "Wi-Fi 名称不匹配：当前读取到“$current”，要求“${ssid.trim()}”。请确认连接了指定 Wi-Fi，名称需完全一致。"; return
-            }
-        }
         scope.launch {
             busy = true
-            message = "正在保存打卡记录…"
+            message = "正在读取统一考勤配置…"
             try {
-                val cfg = R2Config(account, bucket, access, secret, ssid)
+                val baseStore = R2Store(R2Config(account, bucket, access, secret, ""))
+                val allowedSsid = baseStore.readAllowedSsidAsync()
+                if (allowedSsid.isBlank()) {
+                    message = "管理员尚未在 R2 的 app-config.json 中设置考勤 Wi-Fi，请联系管理员。"
+                    return@launch
+                }
+                val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                if (!wm.isWifiEnabled) {
+                    message = "Wi-Fi 验证失败：手机 Wi-Fi 未开启，请连接指定 Wi-Fi 后重试。"
+                    return@launch
+                }
+                @Suppress("DEPRECATION")
+                val current = runCatching { wm.connectionInfo?.ssid?.trim('"') }.getOrNull()
+                when {
+                    current.isNullOrBlank() || current == "<unknown ssid>" -> {
+                        message = "Wi-Fi 验证失败：Android 未向 App 提供当前 Wi-Fi 名称。请检查 App 的附近 Wi-Fi 权限，并开启手机定位后重试。"
+                        return@launch
+                    }
+                    current != allowedSsid.trim() -> {
+                        message = "Wi-Fi 名称不匹配：当前读取到“" + current + "”，要求“" + allowedSsid.trim() + "”。请连接指定 Wi-Fi 后重试。"
+                        return@launch
+                    }
+                }
+                message = "正在保存打卡记录…"
+                val cfg = R2Config(account, bucket, access, secret, allowedSsid)
                 val now = ZonedDateTime.now().toString()
                 val punch = Punch(employeeId = employeeId, at = now, type = type, day = today.toString())
                 val saved = R2Store(cfg).updatePunchesAndVerifyAsync(monthKey, punch)
@@ -587,7 +605,7 @@ fun WorkClockApp(context: Context) {
                                     OutlinedTextField(access, { access = it }, label = { Text("Access Key ID") }, singleLine = true)
                                     OutlinedTextField(secret, { secret = it }, label = { Text("Secret Access Key") }, singleLine = true)
                                     if (role == "admin" && loggedIn) {
-                                        OutlinedTextField(ssid, { if (role == "admin" || !loggedIn) ssid = it }, label = { Text("指定 WiFi 名称（管理员必填）") }, supportingText = { Text("未设置指定 Wi-Fi 时，所有账号均不能打卡。") }, singleLine = true, enabled = role == "admin" || !loggedIn)
+                                        OutlinedTextField(ssid, { ssid = it }, label = { Text("统一考勤 Wi-Fi 名称") }, supportingText = { Text("管理员保存后写入 R2/app-config.json，所有员工设备共用；员工无需单独设置。") }, singleLine = true)
                                     }
                                 }
                                 prefs.getString("last_punch_error", null)?.let { savedError ->
