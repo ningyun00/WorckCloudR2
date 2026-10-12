@@ -62,6 +62,9 @@ class R2Store(private val config: R2Config) {
         ) null else throw e
     }
 
+    private fun readProfile(employeeId: String): ProfileData? =
+        readText("profiles/" + employeeId + ".json")?.let { gson.fromJson(it, ProfileData::class.java) }
+
     private fun writeText(key: String, content: String) {
         client.putObject(
             PutObjectRequest.builder().bucket(config.bucket).key(key).contentType("application/json; charset=utf-8").build(),
