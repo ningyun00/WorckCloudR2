@@ -591,10 +591,9 @@ private fun calculateHours(items: List<Punch>): Double {
                 if (start != null) lastOut = at
             }
             "TEMP_OUT" -> {
-                // Temporary departure closes this interval; next punch may start a new one.
+                // Temporary departure closes the current interval at the TEMP_OUT timestamp itself.
                 if (start != null) {
-                    val end = lastOut ?: at
-                    total += Duration.between(start, end).toMillis().coerceAtLeast(0)
+                    total += Duration.between(start, at).toMillis().coerceAtLeast(0)
                     start = null
                     lastOut = null
                 }
