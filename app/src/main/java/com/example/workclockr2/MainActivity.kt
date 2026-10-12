@@ -523,6 +523,170 @@ fun WorkClockApp(context: Context) {
                         Text("有打卡记录的日期会显示当天工时；点击任意日期可查看该日记录。", color = Muted, fontSize = 11.sp)
                     }
                 }
+            } else if (showMakeUpRecords && role == "admin") {
+                val recordGroups = makeUpQueryPunches
+                    .filter { it.employeeId.let { id -> makeUpQueryEmployee.isBlank() || id == makeUpQueryEmployee } }
+                    .filter { it.day >= makeUpQueryStart && it.day <= makeUpQueryEnd }
+                    .filter { it.id.endsWith("-IN") }
+                    .sortedWith(compareByDescending<Punch> { it.day }.thenByDescending { it.at })
+                    .mapNotNull { start ->
+                        val groupId = start.id.removePrefix("MAKEUP-").removeSuffix("-IN")
+                        val end = makeUpQueryPunches.firstOrNull { it.id == "MAKEUP-$groupId-OUT" }
+                        if (end == null) null else Triple(groupId, start, end)
+                    }
+                Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { showMakeUpRecords = false }) {
+                            Icon(Icons.Default.ArrowBack, null); Text("返回全员")
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text("补班记录", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Ink)
+                    }
+                    Text("可按员工和日期范围查询；修改或删除会同步更新考勤记录。", color = Muted, fontSize = 12.sp)
+                    Spacer(Modifier.height(8.dp))
+                    var employeeFilterExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedTextField(
+                            value = summaryEmployees.firstOrNull { it.employeeId == makeUpQueryEmployee }?.let { "${it.displayName}（${it.employeeId}）" } ?: "全部员工",
+                            onValueChange = {}, readOnly = true, label = { Text("员工筛选") },
+                            trailingIcon = { IconButton(onClick = { employeeFilterExpanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        DropdownMenu(expanded = employeeFilterExpanded, onDismissRequest = { employeeFilterExpanded = false }) {
+                            DropdownMenuItem(text = { Text("全部员工") }, onClick = { makeUpQueryEmployee = ""; employeeFilterExpanded = false })
+                            summaryEmployees.forEach { emp ->
+                                DropdownMenuItem(text = { Text("${emp.displayName}（${emp.employeeId}）") }, onClick = { makeUpQueryEmployee = emp.employeeId; employeeFilterExpanded = false })
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = makeUpQueryStart, onValueChange = { makeUpQueryStart = it },
+                            label = { Text("开始日期 YYYY-MM-DD") }, singleLine = true, modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = makeUpQueryEnd, onValueChange = { makeUpQueryEnd = it },
+                            label = { Text("结束日期 YYYY-MM-DD") }, singleLine = true, modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Button(enabled = !summaryLoading && runCatching { LocalDate.parse(makeUpQueryStart).isBefore(LocalDate.parse(makeUpQueryEnd).plusDays(1)) }.getOrDefault(false), onClick = {
+                        scope.launch {
+                            summaryLoading = true
+                            summaryError = ""
+                            try {
+                                val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                summaryEmployees = store.readEmployeesAsync().filter { it.enabled }
+                                val start = LocalDate.parse(makeUpQueryStart)
+                                val end = LocalDate.parse(makeUpQueryEnd)
+                                val months = generateSequence(YearMonth.from(start)) { current -> if (current < YearMonth.from(end)) current.plusMonths(1) else null }.toList()
+                                makeUpQueryPunches = months.flatMap { month -> store.readPunchesAsync(month.toString()) }
+                                    .filter { it.id.startsWith("MAKEUP-") }
+                            } catch (e: Exception) {
+                                summaryError = "查询补班记录失败：${e.message ?: e.javaClass.simpleName}"
+                            } finally { summaryLoading = false }
+                        }
+                    }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Search, null); Spacer(Modifier.width(6.dp)); Text(if (summaryLoading) "查询中…" else "查询")
+                    }
+                    if (summaryError.isNotBlank()) Text(summaryError, color = Color(0xFFD34B54), fontSize = 12.sp)
+                    Text("查询到 ${recordGroups.size} 个补班时间段", color = Muted, fontSize = 12.sp)
+                    LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(recordGroups, key = { it.first }) { (groupId, start, end) ->
+                            val emp = summaryEmployees.firstOrNull { it.employeeId == start.employeeId }
+                            Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(14.dp)) {
+                                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                                    Text("${emp?.displayName ?: start.employeeId}（${start.employeeId}）", color = Ink, fontWeight = FontWeight.Bold)
+                                    Text("${start.day} · ${runCatching { ZonedDateTime.parse(start.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault(start.at.takeLast(8).take(5))} - ${runCatching { ZonedDateTime.parse(end.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault(end.at.takeLast(8).take(5))}", color = Blue, fontWeight = FontWeight.Medium)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TextButton(onClick = {
+                                            editingMakeUpGroup = groupId
+                                            editingMakeUpDate = start.day
+                                            editingMakeUpStart = runCatching { ZonedDateTime.parse(start.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault("09:00")
+                                            editingMakeUpEnd = runCatching { ZonedDateTime.parse(end.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault("18:00")
+                                            makeUpEmployeeId = start.employeeId
+                                        }) { Icon(Icons.Default.Edit, null); Text("修改") }
+                                        TextButton(onClick = {
+                                            scope.launch {
+                                                summaryLoading = true
+                                                try {
+                                                    val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                                    val month = start.day.take(7)
+                                                    val rows = store.readPunchesAsync(month).filterNot { it.id == start.id || it.id == end.id }
+                                                    store.writePunchesAsync(month, rows)
+                                                    makeUpQueryPunches = makeUpQueryPunches.filterNot { it.id == start.id || it.id == end.id }
+                                                    message = "已删除该补班时间段"
+                                                } catch (e: Exception) { message = "删除失败：${e.message ?: e.javaClass.simpleName}" }
+                                                finally { summaryLoading = false }
+                                            }
+                                        }) { Icon(Icons.Default.Delete, null); Text("删除") }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (recordGroups.isEmpty() && !summaryLoading) Text("当前条件没有补班记录。", color = Muted, modifier = Modifier.padding(vertical = 12.dp))
+                }
+                if (editingMakeUpGroup != null) {
+                    val groupId = editingMakeUpGroup!!
+                    val start = makeUpQueryPunches.firstOrNull { it.id == "MAKEUP-$groupId-IN" }
+                    val end = makeUpQueryPunches.firstOrNull { it.id == "MAKEUP-$groupId-OUT" }
+                    var showEditDatePicker by remember(groupId) { mutableStateOf(false) }
+                    var showEditStartPicker by remember(groupId) { mutableStateOf(false) }
+                    var showEditEndPicker by remember(groupId) { mutableStateOf(false) }
+                    AlertDialog(
+                        onDismissRequest = { editingMakeUpGroup = null },
+                        title = { Text("修改补班记录") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(summaryEmployees.firstOrNull { it.employeeId == makeUpEmployeeId }?.let { "${it.displayName}（${it.employeeId}）" } ?: makeUpEmployeeId, color = Muted)
+                                OutlinedTextField(value = editingMakeUpDate, onValueChange = {}, readOnly = true, label = { Text("补班日期") }, trailingIcon = { IconButton(onClick = { showEditDatePicker = true }) { Icon(Icons.Default.CalendarMonth, null) } }, modifier = Modifier.fillMaxWidth().clickable { showEditDatePicker = true })
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(value = editingMakeUpStart, onValueChange = {}, readOnly = true, label = { Text("开始时间") }, trailingIcon = { IconButton(onClick = { showEditStartPicker = true }) { Icon(Icons.Default.AccessTime, null) } }, modifier = Modifier.weight(1f).clickable { showEditStartPicker = true })
+                                    OutlinedTextField(value = editingMakeUpEnd, onValueChange = {}, readOnly = true, label = { Text("结束时间") }, trailingIcon = { IconButton(onClick = { showEditEndPicker = true }) { Icon(Icons.Default.AccessTime, null) } }, modifier = Modifier.weight(1f).clickable { showEditEndPicker = true })
+                                }
+                                if (showEditDatePicker) {
+                                    val state = rememberDatePickerState(initialSelectedDateMillis = LocalDate.parse(editingMakeUpDate).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+                                    DatePickerDialog(onDismissRequest = { showEditDatePicker = false }, confirmButton = { TextButton(onClick = { state.selectedDateMillis?.let { editingMakeUpDate = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toString() }; showEditDatePicker = false }) { Text("确定") } }, dismissButton = { TextButton(onClick = { showEditDatePicker = false }) { Text("取消") } }) { DatePicker(state = state) }
+                                }
+                                if (showEditStartPicker || showEditEndPicker) {
+                                    val isStart = showEditStartPicker
+                                    val initial = LocalTime.parse(if (isStart) editingMakeUpStart else editingMakeUpEnd)
+                                    val state = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute, is24Hour = true)
+                                    AlertDialog(onDismissRequest = { showEditStartPicker = false; showEditEndPicker = false }, title = { Text(if (isStart) "选择开始时间" else "选择结束时间") }, text = { TimePicker(state = state) }, confirmButton = { TextButton(onClick = { val value = "%02d:%02d".format(state.hour, state.minute); if (isStart) editingMakeUpStart = value else editingMakeUpEnd = value; showEditStartPicker = false; showEditEndPicker = false }) { Text("确定") } }, dismissButton = { TextButton(onClick = { showEditStartPicker = false; showEditEndPicker = false }) { Text("取消") } })
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            Button(enabled = start != null && end != null && runCatching { LocalDate.parse(editingMakeUpDate); LocalTime.parse(editingMakeUpStart).isBefore(LocalTime.parse(editingMakeUpEnd)) }.getOrDefault(false) && !summaryLoading, onClick = {
+                                scope.launch {
+                                    summaryLoading = true
+                                    try {
+                                        val oldStart = start!!
+                                        val oldEnd = end!!
+                                        val date = LocalDate.parse(editingMakeUpDate)
+                                        val newStart = oldStart.copy(at = date.atTime(LocalTime.parse(editingMakeUpStart)).atZone(ZoneId.systemDefault()).toString(), day = date.toString())
+                                        val newEnd = oldEnd.copy(at = date.atTime(LocalTime.parse(editingMakeUpEnd)).atZone(ZoneId.systemDefault()).toString(), day = date.toString())
+                                        val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                        val oldMonth = oldStart.day.take(7)
+                                        val newMonth = date.toString().take(7)
+                                        if (oldMonth == newMonth) {
+                                            val rows = store.readPunchesAsync(oldMonth).map { when (it.id) { oldStart.id -> newStart; oldEnd.id -> newEnd; else -> it } }
+                                            store.writePunchesAsync(oldMonth, rows)
+                                        } else {
+                                            store.writePunchesAsync(oldMonth, store.readPunchesAsync(oldMonth).filterNot { it.id == oldStart.id || it.id == oldEnd.id })
+                                            store.writePunchesAsync(newMonth, store.readPunchesAsync(newMonth) + newStart + newEnd)
+                                        }
+                                        makeUpQueryPunches = makeUpQueryPunches.filterNot { it.id == oldStart.id || it.id == oldEnd.id } + newStart + newEnd
+                                        editingMakeUpGroup = null
+                                        message = "补班记录已修改"
+                                    } catch (e: Exception) { message = "修改失败：${e.message ?: e.javaClass.simpleName}" }
+                                    finally { summaryLoading = false }
+                                }
+                            }) { Text(if (summaryLoading) "保存中…" else "保存修改") }
+                        },
+                        dismissButton = { TextButton(onClick = { editingMakeUpGroup = null }) { Text("取消") } }
+                    )
+                }
             } else if (showAdminSummary && role == "admin") {
                 Column(Modifier.fillMaxSize().padding(padding).pointerInput(role) {
                     var drag = 0f
