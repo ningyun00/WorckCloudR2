@@ -139,26 +139,53 @@ fun WorkClockApp(context: Context) {
     DisposableEffect(context) {
         val activity = context as? ComponentActivity
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && loggedIn && configured) {
-                // Refresh attendance automatically whenever the app returns to the foreground.
-                scope.launch {
-                    try {
-                        val currentMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"))
-                        val store = R2Store(R2Config(account, bucket, access, secret, ssid))
-                        punchList = store.readPunchesAsync(currentMonth).filter { it.employeeId == employeeId }
-                        val todayKey = LocalDate.now().toString()
-                        val todays = punchList.filter { it.day == todayKey }.sortedBy { it.at }
-                        val lastTemp = todays.indexOfLast { it.type == "TEMP_OUT" }
-                        status = if (todays.drop(lastTemp + 1).any { it.type == "IN" }) "已上班" else if (todays.isNotEmpty()) "已打卡" else "尚未打卡"
-                        if (showAdminSummary && role == "admin") {
-                            summaryEmployees = store.readEmployeesAsync().filter { it.enabled }
-                            summaryPunches = store.readPunchesAsync(currentMonth)
+            if (event == Lifecycle.Event.ON_RESUME) {
+                // Rehydrate durable settings/session after process recreation or vendor task cleanup.
+                // Never treat returning to foreground as a logout.
+                val savedAccount = prefs.getString("account", "") ?: ""
+                val savedAccess = prefs.getString("access", "") ?: ""
+                val savedSecret = prefs.getString("secret", "") ?: ""
+                val savedSsid = prefs.getString("ssid", "") ?: ""
+                val savedEmployee = prefs.getString("employee", "") ?: ""
+                val savedName = prefs.getString("name", "员工") ?: "员工"
+                val savedRole = prefs.getString("role", "") ?: ""
+                val savedLoggedIn = prefs.getBoolean("loggedIn", false)
+                if (savedAccount.isNotBlank() && savedAccess.isNotBlank() && savedSecret.isNotBlank()) {
+                    account = savedAccount
+                    access = savedAccess
+                    secret = savedSecret
+                    ssid = savedSsid
+                    showSettings = false
+                }
+                if (savedLoggedIn && savedEmployee.isNotBlank()) {
+                    employeeId = savedEmployee
+                    employeeName = savedName
+                    role = savedRole
+                    loggedIn = true
+                } else if (!savedLoggedIn) {
+                    loggedIn = false
+                }
+                if (loggedIn && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) {
+                    // Refresh attendance automatically whenever the app returns to the foreground.
+                    scope.launch {
+                        try {
+                            val currentMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"))
+                            val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                            punchList = store.readPunchesAsync(currentMonth).filter { it.employeeId == employeeId }
+                            val todayKey = LocalDate.now().toString()
+                            val todays = punchList.filter { it.day == todayKey }.sortedBy { it.at }
+                            val lastTemp = todays.indexOfLast { it.type == "TEMP_OUT" }
+                            status = if (todays.drop(lastTemp + 1).any { it.type == "IN" }) "已上班" else if (todays.isNotEmpty()) "已打卡" else "尚未打卡"
+                            if (showAdminSummary && role == "admin") {
+                                summaryEmployees = store.readEmployeesAsync().filter { it.enabled }
+                                summaryPunches = store.readPunchesAsync(currentMonth)
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Log.e("WorkClockRefresh", "恢复前台后刷新考勤失败", e)
+                            message = "恢复前台后刷新数据失败：" + (e.message ?: e.javaClass.simpleName)
                         }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Log.e("WorkClockRefresh", "恢复前台后刷新考勤失败", e)
-                        message = "恢复前台后刷新数据失败：" + (e.message ?: e.javaClass.simpleName)
                     }
                 }
             }
