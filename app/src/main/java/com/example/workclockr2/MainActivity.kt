@@ -480,7 +480,7 @@ fun WorkClockApp(context: Context) {
                                         modifier = Modifier.clickable { showMonthCalendar = !showMonthCalendar }
                                     )
                                 }
-                                Spacer(Modifier.height(14.dp))
+                                Spacer(Modifier.height(8.dp))
                                 val monday = today.with(java.time.DayOfWeek.MONDAY)
                                 val monthFirst = today.withDayOfMonth(1)
                                 val monthDays = monthFirst.lengthOfMonth()
@@ -488,46 +488,58 @@ fun WorkClockApp(context: Context) {
                                 val calendarCells: List<LocalDate?> =
                                     List(monthLeading) { null } + (1..monthDays).map { monthFirst.withDayOfMonth(it) }
                                 val calendarWeeks = (calendarCells.size + 6) / 7
+                                val displayedDays = if (showMonthCalendar) (1..monthDays).map { monthFirst.withDayOfMonth(it) } else (0..6).map { monday.plusDays(it.toLong()) }
+                                val displayedTotalHours = displayedDays.sumOf { d -> calculateHours(punchList.filter { it.day == d.toString() }) }
+                                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text(if (showMonthCalendar) "本月总工时" else "本周总工时", color = Muted, fontSize = 13.sp)
+                                    Text(String.format("%.2f 小时", displayedTotalHours), color = Blue, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                }
                                 if (showMonthCalendar) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                                        listOf("一","二","三","四","五","六","日").forEach { dayName ->
+                                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Text(dayName, color = Muted, fontSize = 10.sp) }
+                                        }
+                                    }
                                     (0 until calendarWeeks).forEach { week ->
                                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                                             (0..6).forEach { col ->
                                                 val d = calendarCells.getOrNull(week * 7 + col)
                                                 if (d == null) {
-                                                    Spacer(Modifier.weight(1f).height(54.dp))
+                                                    Spacer(Modifier.weight(1f).height(62.dp))
                                                 } else {
+                                                    val dayHours = calculateHours(punchList.filter { it.day == d.toString() })
                                                     val has = punchList.any { it.day == d.toString() }
                                                     Column(
-                                                        Modifier.weight(1f)
-                                                            .background(if (d == selectedDay) Color(0xFFE5EEFF) else Color.Transparent, RoundedCornerShape(12.dp))
-                                                            .clickable { selectedDay = d }
-                                                            .padding(vertical = 6.dp),
+                                                        Modifier.weight(1f).background(if (d == selectedDay) Color(0xFFE5EEFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                                            .clickable { selectedDay = d }.padding(vertical = 5.dp),
                                                         horizontalAlignment = Alignment.CenterHorizontally
                                                     ) {
-                                                        Text(listOf("一","二","三","四","五","六","日")[col], color = Muted, fontSize = 10.sp)
+                                                        Text(d.dayOfMonth.toString(), color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                                         Spacer(Modifier.height(2.dp))
-                                                        Text(d.dayOfMonth.toString(), color = Ink, fontWeight = FontWeight.Bold)
-                                                        Icon(if (has) Icons.Default.CheckCircle else Icons.Default.Circle, null, tint = if (has) Color(0xFF19A974) else Color(0xFFDCE3ED), modifier = Modifier.size(10.dp))
+                                                        Text(if (has) String.format("%.1f", dayHours) else "—", color = if (has) Blue else Muted, fontSize = 9.sp, maxLines = 1)
                                                     }
                                                 }
                                             }
                                         }
                                     }
+                                    Text("日期下方为当天工时（小时），点击日期查看打卡明细。", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
                                 } else {
                                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                                         (0..6).forEach { offset ->
                                             val d = monday.plusDays(offset.toLong())
+                                            val dayHours = calculateHours(punchList.filter { it.day == d.toString() })
                                             val has = punchList.any { it.day == d.toString() }
-                                            Column(Modifier.weight(1f).background(if (d == selectedDay) Color(0xFFE5EEFF) else Color.Transparent, RoundedCornerShape(12.dp))
-                                                .clickable { selectedDay = d }.padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(listOf("一","二","三","四","五","六","日")[offset], color = Muted, fontSize = 12.sp)
-                                                Spacer(Modifier.height(6.dp))
-                                                Text(d.dayOfMonth.toString(), color = Ink, fontWeight = FontWeight.Bold)
-                                                Spacer(Modifier.height(6.dp))
-                                                Icon(if (has) Icons.Default.CheckCircle else Icons.Default.Circle, null, tint = if (has) Color(0xFF19A974) else Color(0xFFDCE3ED), modifier = Modifier.size(12.dp))
+                                            Column(Modifier.weight(1f).background(if (d == selectedDay) Color(0xFFE5EEFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                                .clickable { selectedDay = d }.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text(listOf("一","二","三","四","五","六","日")[offset], color = Muted, fontSize = 10.sp)
+                                                Spacer(Modifier.height(4.dp))
+                                                Text(d.dayOfMonth.toString(), color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                Spacer(Modifier.height(3.dp))
+                                                Text(if (has) String.format("%.1f", dayHours) else "—", color = if (has) Blue else Muted, fontSize = 9.sp, maxLines = 1)
                                             }
                                         }
                                     }
+                                    Text("日期下方为当天工时（小时）。", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
                                 }
                             }
                         }
