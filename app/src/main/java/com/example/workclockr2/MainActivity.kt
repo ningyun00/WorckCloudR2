@@ -817,17 +817,74 @@ fun WorkClockApp(context: Context) {
                                 }
                             }
                         }
-                        OutlinedTextField(value = makeUpDate, onValueChange = { makeUpDate = it }, label = { Text("补班日期（YYYY-MM-DD）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        var showMakeUpDatePicker by remember { mutableStateOf(false) }
+                        OutlinedTextField(
+                            value = makeUpDate,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("补班日期") },
+                            trailingIcon = { IconButton(onClick = { showMakeUpDatePicker = true }) { Icon(Icons.Default.CalendarMonth, "选择日期") } },
+                            modifier = Modifier.fillMaxWidth().clickable { showMakeUpDatePicker = true }
+                        )
+                        if (showMakeUpDatePicker) {
+                            val initialDate = runCatching { LocalDate.parse(makeUpDate) }.getOrDefault(LocalDate.now())
+                            val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+                            DatePickerDialog(
+                                onDismissRequest = { showMakeUpDatePicker = false },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        datePickerState.selectedDateMillis?.let { millis ->
+                                            makeUpDate = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString()
+                                        }
+                                        showMakeUpDatePicker = false
+                                    }) { Text("确定") }
+                                },
+                                dismissButton = { TextButton(onClick = { showMakeUpDatePicker = false }) { Text("取消") } }
+                            ) { DatePicker(state = datePickerState) }
+                        }
                         makeUpSegments.forEachIndexed { index, segment ->
-                            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFF4F7FC))) {
+                            Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
                                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text("时间段 ${index + 1}", fontWeight = FontWeight.Bold, color = Ink)
                                         if (makeUpSegments.size > 1) TextButton(onClick = { makeUpSegments = makeUpSegments.filterIndexed { i, _ -> i != index } }) { Text("删除") }
                                     }
+                                    var showStartTimePicker by remember(index) { mutableStateOf(false) }
+                                    var showEndTimePicker by remember(index) { mutableStateOf(false) }
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        OutlinedTextField(value = segment.start, onValueChange = { value -> makeUpSegments = makeUpSegments.mapIndexed { i, s -> if (i == index) s.copy(start = value) else s } }, label = { Text("开始时间 HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
-                                        OutlinedTextField(value = segment.end, onValueChange = { value -> makeUpSegments = makeUpSegments.mapIndexed { i, s -> if (i == index) s.copy(end = value) else s } }, label = { Text("结束时间 HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
+                                        OutlinedTextField(
+                                            value = segment.start, onValueChange = {}, readOnly = true,
+                                            label = { Text("开始时间") },
+                                            trailingIcon = { IconButton(onClick = { showStartTimePicker = true }) { Icon(Icons.Default.AccessTime, "选择开始时间") } },
+                                            modifier = Modifier.weight(1f).clickable { showStartTimePicker = true }
+                                        )
+                                        OutlinedTextField(
+                                            value = segment.end, onValueChange = {}, readOnly = true,
+                                            label = { Text("结束时间") },
+                                            trailingIcon = { IconButton(onClick = { showEndTimePicker = true }) { Icon(Icons.Default.AccessTime, "选择结束时间") } },
+                                            modifier = Modifier.weight(1f).clickable { showEndTimePicker = true }
+                                        )
+                                    }
+                                    if (showStartTimePicker || showEndTimePicker) {
+                                        val editingStart = showStartTimePicker
+                                        val initialTime = runCatching { LocalTime.parse(if (editingStart) segment.start else segment.end) }.getOrDefault(LocalTime.of(9, 0))
+                                        val timePickerState = rememberTimePickerState(initialHour = initialTime.hour, initialMinute = initialTime.minute, is24Hour = true)
+                                        AlertDialog(
+                                            onDismissRequest = { showStartTimePicker = false; showEndTimePicker = false },
+                                            title = { Text(if (editingStart) "选择开始时间" else "选择结束时间") },
+                                            text = { TimePicker(state = timePickerState) },
+                                            confirmButton = {
+                                                TextButton(onClick = {
+                                                    val value = "%02d:%02d".format(timePickerState.hour, timePickerState.minute)
+                                                    makeUpSegments = makeUpSegments.mapIndexed { i, s ->
+                                                        if (i == index) if (editingStart) s.copy(start = value) else s.copy(end = value) else s
+                                                    }
+                                                    showStartTimePicker = false
+                                                    showEndTimePicker = false
+                                                }) { Text("确定") }
+                                            },
+                                            dismissButton = { TextButton(onClick = { showStartTimePicker = false; showEndTimePicker = false }) { Text("取消") } }
+                                        )
                                     }
                                 }
                             }
