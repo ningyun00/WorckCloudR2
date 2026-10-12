@@ -447,22 +447,66 @@ fun WorkClockApp(context: Context) {
                         Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
                             Column(Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                    Text("本周打卡", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
-                                    Text(today.format(DateTimeFormatter.ofPattern("yyyy年MM月")), color = Muted, fontSize = 12.sp)
+                                    Text(
+                                        if (showMonthCalendar) "本月打卡" else "本周打卡",
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Ink,
+                                        modifier = Modifier.clickable { showMonthCalendar = !showMonthCalendar }
+                                    )
+                                    Text(
+                                        today.format(DateTimeFormatter.ofPattern("yyyy年MM月")) + " · 点击标题切换",
+                                        color = Muted,
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.clickable { showMonthCalendar = !showMonthCalendar }
+                                    )
                                 }
                                 Spacer(Modifier.height(14.dp))
                                 val monday = today.with(java.time.DayOfWeek.MONDAY)
-                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                                    (0..6).forEach { offset ->
-                                        val d = monday.plusDays(offset.toLong())
-                                        val has = punchList.any { it.day == d.toString() }
-                                        Column(Modifier.weight(1f).background(if (d == selectedDay) Color(0xFFE5EEFF) else Color.Transparent, RoundedCornerShape(12.dp))
-                                            .clickable { selectedDay = d }.padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text(listOf("一","二","三","四","五","六","日")[offset], color = Muted, fontSize = 12.sp)
-                                            Spacer(Modifier.height(6.dp))
-                                            Text(d.dayOfMonth.toString(), color = Ink, fontWeight = FontWeight.Bold)
-                                            Spacer(Modifier.height(6.dp))
-                                            Icon(if (has) Icons.Default.CheckCircle else Icons.Default.Circle, null, tint = if (has) Color(0xFF19A974) else Color(0xFFDCE3ED), modifier = Modifier.size(12.dp))
+                                val monthFirst = today.withDayOfMonth(1)
+                                val monthDays = monthFirst.lengthOfMonth()
+                                val monthLeading = monthFirst.dayOfWeek.value - 1
+                                val calendarCells: List<LocalDate?> =
+                                    List(monthLeading) { null } + (1..monthDays).map { monthFirst.withDayOfMonth(it) }
+                                val calendarWeeks = (calendarCells.size + 6) / 7
+                                if (showMonthCalendar) {
+                                    (0 until calendarWeeks).forEach { week ->
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                                            (0..6).forEach { col ->
+                                                val d = calendarCells.getOrNull(week * 7 + col)
+                                                if (d == null) {
+                                                    Spacer(Modifier.weight(1f).height(54.dp))
+                                                } else {
+                                                    val has = punchList.any { it.day == d.toString() }
+                                                    Column(
+                                                        Modifier.weight(1f)
+                                                            .background(if (d == selectedDay) Color(0xFFE5EEFF) else Color.Transparent, RoundedCornerShape(12.dp))
+                                                            .clickable { selectedDay = d }
+                                                            .padding(vertical = 6.dp),
+                                                        horizontalAlignment = Alignment.CenterHorizontally
+                                                    ) {
+                                                        Text(listOf("一","二","三","四","五","六","日")[col], color = Muted, fontSize = 10.sp)
+                                                        Spacer(Modifier.height(2.dp))
+                                                        Text(d.dayOfMonth.toString(), color = Ink, fontWeight = FontWeight.Bold)
+                                                        Icon(if (has) Icons.Default.CheckCircle else Icons.Default.Circle, null, tint = if (has) Color(0xFF19A974) else Color(0xFFDCE3ED), modifier = Modifier.size(10.dp))
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                                        (0..6).forEach { offset ->
+                                            val d = monday.plusDays(offset.toLong())
+                                            val has = punchList.any { it.day == d.toString() }
+                                            Column(Modifier.weight(1f).background(if (d == selectedDay) Color(0xFFE5EEFF) else Color.Transparent, RoundedCornerShape(12.dp))
+                                                .clickable { selectedDay = d }.padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text(listOf("一","二","三","四","五","六","日")[offset], color = Muted, fontSize = 12.sp)
+                                                Spacer(Modifier.height(6.dp))
+                                                Text(d.dayOfMonth.toString(), color = Ink, fontWeight = FontWeight.Bold)
+                                                Spacer(Modifier.height(6.dp))
+                                                Icon(if (has) Icons.Default.CheckCircle else Icons.Default.Circle, null, tint = if (has) Color(0xFF19A974) else Color(0xFFDCE3ED), modifier = Modifier.size(12.dp))
+                                            }
                                         }
                                     }
                                 }
