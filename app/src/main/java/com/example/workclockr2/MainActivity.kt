@@ -115,6 +115,7 @@ fun WorkClockApp(context: Context) {
     var makeUpQueryEnd by remember { mutableStateOf(LocalDate.now().toString()) }
     var makeUpQueryPunches by remember { mutableStateOf(listOf<Punch>()) }
     var editingMakeUpGroup by remember { mutableStateOf<String?>(null) }
+    var pendingDeleteMakeUp by remember { mutableStateOf<Pair<Punch, Punch>?>(null) }
     var editingMakeUpDate by remember { mutableStateOf(LocalDate.now().toString()) }
     var editingMakeUpStart by remember { mutableStateOf("09:00") }
     var editingMakeUpEnd by remember { mutableStateOf("18:00") }
@@ -527,7 +528,7 @@ fun WorkClockApp(context: Context) {
                 val recordGroups = makeUpQueryPunches
                     .filter { it.employeeId.let { id -> makeUpQueryEmployee.isBlank() || id == makeUpQueryEmployee } }
                     .filter { it.day >= makeUpQueryStart && it.day <= makeUpQueryEnd }
-                    .filter { it.id.endsWith("-IN") }
+                    .filter { it.id.endsWith("-IN") && it.type == "IN" }
                     .sortedWith(compareByDescending<Punch> { it.day }.thenByDescending { it.at })
                     .mapNotNull { start ->
                         val groupId = start.id.removePrefix("MAKEUP-").removeSuffix("-IN")
@@ -580,7 +581,7 @@ fun WorkClockApp(context: Context) {
                                 val end = LocalDate.parse(makeUpQueryEnd)
                                 val months = generateSequence(YearMonth.from(start)) { current -> if (current < YearMonth.from(end)) current.plusMonths(1) else null }.toList()
                                 makeUpQueryPunches = months.flatMap { month -> store.readPunchesAsync(month.toString()) }
-                                    .filter { it.id.startsWith("MAKEUP-") }
+                                    .filter { it.id.startsWith("MAKEUP-") && it.type != "MAKEUP_DELETED" }
                             } catch (e: Exception) {
                                 summaryError = "查询补班记录失败：${e.message ?: e.javaClass.simpleName}"
                             } finally { summaryLoading = false }
@@ -605,26 +606,44 @@ fun WorkClockApp(context: Context) {
                                             editingMakeUpEnd = runCatching { ZonedDateTime.parse(end.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault("18:00")
                                             makeUpEmployeeId = start.employeeId
                                         }) { Icon(Icons.Default.Edit, null); Text("修改") }
-                                        TextButton(onClick = {
-                                            scope.launch {
-                                                summaryLoading = true
-                                                try {
-                                                    val store = R2Store(R2Config(account, bucket, access, secret, ssid))
-                                                    val month = start.day.take(7)
-                                                    val rows = store.readPunchesAsync(month).filterNot { it.id == start.id || it.id == end.id }
-                                                    store.writePunchesAsync(month, rows)
-                                                    makeUpQueryPunches = makeUpQueryPunches.filterNot { it.id == start.id || it.id == end.id }
-                                                    message = "已删除该补班时间段"
-                                                } catch (e: Exception) { message = "删除失败：${e.message ?: e.javaClass.simpleName}" }
-                                                finally { summaryLoading = false }
-                                            }
-                                        }) { Icon(Icons.Default.Delete, null); Text("删除") }
+                                        TextButton(onClick = { pendingDeleteMakeUp = start to end }) { Icon(Icons.Default.Delete, null); Text("删除") }
                                     }
                                 }
                             }
                         }
                     }
                     if (recordGroups.isEmpty() && !summaryLoading) Text("当前条件没有补班记录。", color = Muted, modifier = Modifier.padding(vertical = 12.dp))
+                }
+                if (pendingDeleteMakeUp != null) {
+                    val (deleteStart, deleteEnd) = pendingDeleteMakeUp!!
+                    AlertDialog(
+                        onDismissRequest = { pendingDeleteMakeUp = null },
+                        title = { Text("确认删除补班记录") },
+                        text = { Text("确定删除 ${deleteStart.day} 的补班时间段吗？删除后该记录将被隐藏，不会再参与工时统计。") },
+                        confirmButton = {
+                            Button(enabled = !summaryLoading, onClick = {
+                                scope.launch {
+                                    summaryLoading = true
+                                    try {
+                                        val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                        val month = deleteStart.day.take(7)
+                                        val rows = store.readPunchesAsync(month).map {
+                                            if (it.id == deleteStart.id || it.id == deleteEnd.id) it.copy(type = "MAKEUP_DELETED") else it
+                                        }
+                                        store.writePunchesAsync(month, rows)
+                                        val verified = store.readPunchesAsync(month)
+                                        check(verified.any { it.id == deleteStart.id && it.type == "MAKEUP_DELETED" } &&
+                                            verified.any { it.id == deleteEnd.id && it.type == "MAKEUP_DELETED" }) { "软删除回读验证失败" }
+                                        makeUpQueryPunches = makeUpQueryPunches.filterNot { it.id == deleteStart.id || it.id == deleteEnd.id }
+                                        pendingDeleteMakeUp = null
+                                        message = "补班记录已软删除"
+                                    } catch (e: Exception) { message = "删除失败：${e.message ?: e.javaClass.simpleName}" }
+                                    finally { summaryLoading = false }
+                                }
+                            }) { Text(if (summaryLoading) "处理中…" else "确认删除") }
+                        },
+                        dismissButton = { TextButton(onClick = { pendingDeleteMakeUp = null }) { Text("取消") } }
+                    )
                 }
                 if (editingMakeUpGroup != null) {
                     val groupId = editingMakeUpGroup!!
@@ -1037,7 +1056,7 @@ fun WorkClockApp(context: Context) {
                             ) { DatePicker(state = datePickerState) }
                         }
                         makeUpSegments.forEachIndexed { index, segment ->
-                            Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFF0EAF5))) {
                                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text("时间段 ${index + 1}", fontWeight = FontWeight.Bold, color = Ink)
