@@ -288,8 +288,25 @@ fun WorkClockApp(context: Context) {
                                     employeeId = emp.employeeId; employeeName = emp.displayName; role = emp.role
                                     loggedIn = true; needChangePassword = emp.mustChangePassword
                                     prefs.edit().putString("employee", employeeId).putString("name", employeeName).putString("role", role).putBoolean("loggedIn", true).apply()
-                                    punchList = runCatching { store.readPunchesAsync(monthKey).filter { it.employeeId == employeeId } }.getOrDefault(emptyList())
-                                    message = if (needChangePassword) "当前为初始密码，请联系管理员更新 employees.json 中的密码配置。" else "登录成功"
+                                    try {
+                                        punchList = store.readPunchesAsync(monthKey).filter { it.employeeId == employeeId }
+                                        val todayKey = LocalDate.now().toString()
+                                        val todays = punchList.filter { it.day == todayKey }.sortedBy { it.at }
+                                        val lastTemp = todays.indexOfLast { it.type == "TEMP_OUT" }
+                                        status = if (todays.drop(lastTemp + 1).any { it.type == "IN" }) {
+                                            "已上班"
+                                        } else if (todays.isNotEmpty()) {
+                                            "已打卡"
+                                        } else {
+                                            "尚未打卡"
+                                        }
+                                        message = if (needChangePassword) "当前为初始密码，请联系管理员更新 employees.json 中的密码配置。" else "登录成功，已同步今日打卡状态。"
+                                    } catch (refreshError: Exception) {
+                                        Log.e("WorkClockLogin", "登录后读取考勤失败", refreshError)
+                                        punchList = emptyList()
+                                        status = "状态读取失败"
+                                        message = "登录成功，但读取考勤记录失败：" + (refreshError.message ?: refreshError.javaClass.simpleName)
+                                    }
                                 }
                             } catch (e: Exception) { message = "登录失败：${e.message ?: "请检查 R2 文件"}" }
                             finally { busy = false }
