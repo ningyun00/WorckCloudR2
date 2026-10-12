@@ -25,6 +25,10 @@ class R2Store(private val config: R2Config) {
     suspend fun writeEmployeesAsync(employees: List<Employee>) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writeEmployees(employees) }
     suspend fun readAllowedSsidAsync(): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readAllowedSsid() }
     suspend fun writeAllowedSsidAsync(ssid: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writeAllowedSsid(ssid) }
+    suspend fun writeBinaryAsync(key: String, bytes: ByteArray, contentType: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { client.putObject(PutObjectRequest.builder().bucket(config.bucket).key(key).contentType(contentType).build(), RequestBody.fromBytes(bytes)) }
+    suspend fun readBinaryAsync(key: String): ByteArray? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { try { client.getObjectAsBytes(GetObjectRequest.builder().bucket(config.bucket).key(key).build()).asByteArray() } catch (e: Exception) { val s3 = e as? software.amazon.awssdk.services.s3.model.S3Exception; if (s3?.statusCode() == 404 || e.message?.contains("NoSuchKey", true) == true || e.message?.contains("404", true) == true) null else throw e } }
+    suspend fun writeProfileAsync(profile: ProfileData) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writeText("profiles/" + profile.employeeId + ".json", gson.toJson(profile)); check(readProfile(profile.employeeId) == profile) { "个人资料写入后回读验证失败" } }
+    suspend fun readProfileAsync(employeeId: String): ProfileData? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readText("profiles/" + employeeId + ".json")?.let { gson.fromJson(it, ProfileData::class.java) } }
     suspend fun updatePunchesAndVerifyAsync(month: String, punch: Punch): List<Punch> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val existing = readPunches(month)
         val merged = existing.filterNot { it.id == punch.id } + punch
