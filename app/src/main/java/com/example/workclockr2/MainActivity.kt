@@ -47,6 +47,7 @@ private val Muted = Color(0xFF758198)
 
 data class R2Config(val accountId: String, val bucket: String, val accessKey: String, val secretKey: String, val allowedSsid: String)
 data class Punch(val id: String = UUID.randomUUID().toString(), val employeeId: String, val at: String, val type: String, val day: String)
+data class MakeUpSegment(val start: String = "09:00", val end: String = "18:00")
 data class Employee(val employeeId: String, val displayName: String, val role: String, val passwordSalt: String, val passwordHash: String, val mustChangePassword: Boolean, val enabled: Boolean)
 
 class MainActivity : ComponentActivity() {
@@ -94,6 +95,12 @@ fun WorkClockApp(context: Context) {
     var createName by remember { mutableStateOf("") }
     var createRole by remember { mutableStateOf("employee") }
     var busy by remember { mutableStateOf(false) }
+    var showMakeUpDialog by remember { mutableStateOf(false) }
+    var makeUpEmployees by remember { mutableStateOf(listOf<Employee>()) }
+    var makeUpEmployeeId by remember { mutableStateOf("") }
+    var makeUpDate by remember { mutableStateOf(LocalDate.now().toString()) }
+    var makeUpSegments by remember { mutableStateOf(listOf(MakeUpSegment())) }
+    var makeUpSaving by remember { mutableStateOf(false) }
     var testingConnection by remember { mutableStateOf(false) }
     var creatingEmployee by remember { mutableStateOf(false) }
     var loginId by remember { mutableStateOf("") }
@@ -635,7 +642,22 @@ fun WorkClockApp(context: Context) {
                         }
                     }
                     item {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            if (role == "admin") {
+                                TextButton(onClick = {
+                                    showMakeUpDialog = true
+                                    makeUpDate = LocalDate.now().toString()
+                                    makeUpSegments = listOf(MakeUpSegment())
+                                    scope.launch {
+                                        try {
+                                            makeUpEmployees = R2Store(R2Config(account, bucket, access, secret, ssid)).readEmployeesAsync().filter { it.enabled }
+                                            if (makeUpEmployeeId.isBlank() && makeUpEmployees.isNotEmpty()) makeUpEmployeeId = makeUpEmployees.first().employeeId
+                                        } catch (e: Exception) { message = "读取员工列表失败：" + (e.message ?: e.javaClass.simpleName); showMakeUpDialog = false }
+                                    }
+                                }, enabled = !busy) {
+                                    Icon(Icons.Default.EventAvailable, null); Spacer(Modifier.width(4.dp)); Text("补班")
+                                }
+                            } else Spacer(Modifier.width(1.dp))
                             TextButton(onClick = { doPunch("TEMP_OUT") }, enabled = !busy) {
                                 Icon(Icons.Default.PauseCircle, null); Spacer(Modifier.width(4.dp)); Text("临时下班")
                             }
@@ -774,6 +796,80 @@ fun WorkClockApp(context: Context) {
                 }
             }
         }
+
+        if (showMakeUpDialog && role == "admin") {
+            AlertDialog(
+                onDismissRequest = { if (!makeUpSaving) showMakeUpDialog = false },
+                title = { Text("管理员补班") },
+                text = {
+                    Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("选择员工、日期和一个或多个补班时间段。每个时间段会生成一条上班和一条下班记录。", color = Muted, fontSize = 12.sp)
+                        var employeeMenuExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            OutlinedTextField(
+                                value = makeUpEmployees.firstOrNull { it.employeeId == makeUpEmployeeId }?.let { "${it.displayName}（${it.employeeId}）" } ?: "",
+                                onValueChange = {}, readOnly = true, label = { Text("选择员工") }, modifier = Modifier.fillMaxWidth(),
+                                trailingIcon = { IconButton(onClick = { employeeMenuExpanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } }
+                            )
+                            DropdownMenu(expanded = employeeMenuExpanded, onDismissRequest = { employeeMenuExpanded = false }) {
+                                makeUpEmployees.forEach { emp ->
+                                    DropdownMenuItem(text = { Text("${emp.displayName}（${emp.employeeId}）") }, onClick = { makeUpEmployeeId = emp.employeeId; employeeMenuExpanded = false })
+                                }
+                            }
+                        }
+                        OutlinedTextField(value = makeUpDate, onValueChange = { makeUpDate = it }, label = { Text("补班日期（YYYY-MM-DD）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        makeUpSegments.forEachIndexed { index, segment ->
+                            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFF4F7FC))) {
+                                Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("时间段 ${index + 1}", fontWeight = FontWeight.Bold, color = Ink)
+                                        if (makeUpSegments.size > 1) TextButton(onClick = { makeUpSegments = makeUpSegments.filterIndexed { i, _ -> i != index } }) { Text("删除") }
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedTextField(value = segment.start, onValueChange = { value -> makeUpSegments = makeUpSegments.mapIndexed { i, s -> if (i == index) s.copy(start = value) else s } }, label = { Text("开始时间 HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
+                                        OutlinedTextField(value = segment.end, onValueChange = { value -> makeUpSegments = makeUpSegments.mapIndexed { i, s -> if (i == index) s.copy(end = value) else s } }, label = { Text("结束时间 HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
+                        OutlinedButton(onClick = { makeUpSegments = makeUpSegments + MakeUpSegment() }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Add, null); Spacer(Modifier.width(6.dp)); Text("添加时间段")
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(enabled = !makeUpSaving && makeUpEmployeeId.isNotBlank() && runCatching { LocalDate.parse(makeUpDate) }.isSuccess && makeUpSegments.isNotEmpty() && makeUpSegments.all { s -> runCatching { LocalTime.parse(s.start) }.isSuccess && runCatching { LocalTime.parse(s.end) }.isSuccess && runCatching { LocalTime.parse(s.end).isAfter(LocalTime.parse(s.start)) }.getOrDefault(false) }, onClick = {
+                        scope.launch {
+                            makeUpSaving = true
+                            try {
+                                val date = LocalDate.parse(makeUpDate)
+                                val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                val additions = makeUpSegments.flatMap { segment ->
+                                    val startAt = date.atTime(LocalTime.parse(segment.start)).atZone(ZoneId.systemDefault())
+                                    val endAt = date.atTime(LocalTime.parse(segment.end)).atZone(ZoneId.systemDefault())
+                                    listOf(
+                                        Punch(employeeId = makeUpEmployeeId, at = startAt.toString(), type = "IN", day = date.toString()),
+                                        Punch(employeeId = makeUpEmployeeId, at = endAt.toString(), type = "OUT", day = date.toString())
+                                    )
+                                }
+                                val month = date.format(DateTimeFormatter.ofPattern("yyyy-MM"))
+                                val existing = store.readPunchesAsync(month)
+                                store.writePunchesAsync(month, existing + additions)
+                                val confirmed = store.readPunchesAsync(month)
+                                check(additions.all { added -> confirmed.any { it.id == added.id } }) { "补班记录写入后回读验证失败" }
+                                if (month == LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM")) && makeUpEmployeeId == employeeId) punchList = confirmed.filter { it.employeeId == employeeId }
+                                showMakeUpDialog = false
+                                message = "补班成功：${makeUpEmployees.firstOrNull { it.employeeId == makeUpEmployeeId }?.displayName ?: makeUpEmployeeId}，${date}，已添加 ${makeUpSegments.size} 个时间段。"
+                            } catch (e: Exception) {
+                                message = "补班失败：" + (e.message ?: e.javaClass.simpleName)
+                            } finally { makeUpSaving = false }
+                        }
+                    }) { Text(if (makeUpSaving) "保存中…" else "确认补班") }
+                },
+                dismissButton = { TextButton(enabled = !makeUpSaving, onClick = { showMakeUpDialog = false }) { Text("取消") } }
+            )
+        }
+
         if (showMessageDialog && message.isNotBlank()) {
             AlertDialog(
                 onDismissRequest = { showMessageDialog = false },
