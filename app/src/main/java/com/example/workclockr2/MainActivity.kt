@@ -313,7 +313,7 @@ fun WorkClockApp(context: Context) {
                                     Text("存储桶：workcloudr2（固定）", color = Ink, fontWeight = FontWeight.Medium)
                                     OutlinedTextField(access, { access = it }, label = { Text("Access Key ID") }, singleLine = true)
                                     OutlinedTextField(secret, { secret = it }, label = { Text("Secret Access Key") }, singleLine = true)
-                                    if (role == "admin" && loggedIn || !loggedIn) {
+                                    if (role == "admin" && loggedIn) {
                                         OutlinedTextField(ssid, { ssid = it }, label = { Text("指定 WiFi 名称（可选）") }, singleLine = true)
                                     }
                                 }
