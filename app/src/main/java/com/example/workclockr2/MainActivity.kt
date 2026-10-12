@@ -113,6 +113,28 @@ fun WorkClockApp(context: Context) {
                 showAdminConfigAuth = false
                 adminConfigPassword = ""
                 configAuthMessage = ""
+            } else if (event == Lifecycle.Event.ON_RESUME && loggedIn && configured) {
+                // Refresh attendance automatically whenever the app returns to the foreground.
+                scope.launch {
+                    try {
+                        val currentMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"))
+                        val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                        punchList = store.readPunchesAsync(currentMonth).filter { it.employeeId == employeeId }
+                        val todayKey = LocalDate.now().toString()
+                        val todays = punchList.filter { it.day == todayKey }.sortedBy { it.at }
+                        val lastTemp = todays.indexOfLast { it.type == "TEMP_OUT" }
+                        status = if (todays.drop(lastTemp + 1).any { it.type == "IN" }) "已上班" else if (todays.isNotEmpty()) "已打卡" else "尚未打卡"
+                        if (showAdminSummary && role == "admin") {
+                            summaryEmployees = store.readEmployeesAsync().filter { it.enabled }
+                            summaryPunches = store.readPunchesAsync(currentMonth)
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.e("WorkClockRefresh", "恢复前台后刷新考勤失败", e)
+                        message = "恢复前台后刷新数据失败：" + (e.message ?: e.javaClass.simpleName)
+                    }
+                }
             }
         }
         activity?.lifecycle?.addObserver(observer)
@@ -195,6 +217,27 @@ fun WorkClockApp(context: Context) {
             }, actions = {
                 IconButton(onClick = { if (role == "admin" && loggedIn) { configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = ""; configAuthMessage = "" }; showSettings = true }) { Icon(Icons.Default.Settings, "设置") }
             }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF4F7FC)))
+        }, bottomBar = {
+            if (loggedIn && !needChangePassword && !showAdminSummary && configured) {
+                Surface(shadowElevation = 8.dp, color = Color.White) {
+                    OutlinedButton(
+                        onClick = {
+                            loggedIn = false
+                            configUnlocked = false
+                            showAdminConfigAuth = false
+                            adminConfigPassword = ""
+                            prefs.edit().putBoolean("loggedIn", false).apply()
+                            punchList = emptyList()
+                            message = "已退出登录"
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Logout, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("退出登录")
+                    }
+                }
+            }
         }) { padding ->
             if (!configured) {
                 Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center) {
@@ -434,29 +477,29 @@ fun WorkClockApp(context: Context) {
                                     Text("${"%.2f".format(hours)} 小时", color = Blue, fontWeight = FontWeight.Bold)
                                 }
                                 Spacer(Modifier.height(10.dp))
-                                if (dayPunches.isEmpty()) Text("当天暂无打卡记录", color = Muted, modifier = Modifier.padding(vertical = 16.dp))
-                                else dayPunches.forEach { p ->
-                                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Circle, null, tint = when(p.type) { "IN" -> Color(0xFF16A36A); "OUT" -> Color(0xFFDB5864); else -> Color(0xFFED9A32) }, modifier = Modifier.size(10.dp))
-                                        Spacer(Modifier.width(10.dp))
-                                        Column(Modifier.weight(1f)) {
-                                            Text(when(p.type) { "IN" -> "上班打卡"; "OUT" -> "下班打卡"; else -> "临时下班" }, color = Ink, fontWeight = FontWeight.Medium)
-                                            Text(p.at.replace("T", " ").take(19), color = Muted, fontSize = 12.sp)
+                                if (dayPunches.isEmpty()) {
+                                    Text("当天暂无打卡记录", color = Muted, modifier = Modifier.padding(vertical = 16.dp))
+                                } else {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
+                                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                                    ) {
+                                        items(dayPunches, key = { it.id }) { p ->
+                                            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Circle, null, tint = when(p.type) { "IN" -> Color(0xFF16A36A); "OUT" -> Color(0xFFDB5864); else -> Color(0xFFED9A32) }, modifier = Modifier.size(10.dp))
+                                                Spacer(Modifier.width(10.dp))
+                                                Column(Modifier.weight(1f)) {
+                                                    Text(when(p.type) { "IN" -> "上班打卡"; "OUT" -> "下班打卡"; else -> "临时下班" }, color = Ink, fontWeight = FontWeight.Medium)
+                                                    Text(p.at.replace("T", " ").take(19), color = Muted, fontSize = 12.sp)
+                                                }
+                                                Text(when(p.type) { "IN" -> "开始"; "OUT" -> "结束"; else -> "结算区间" }, color = Muted, fontSize = 12.sp)
+                                            }
+                                            HorizontalDivider(color = Color(0xFFF0F3F8))
                                         }
-                                        Text(when(p.type) { "IN" -> "开始"; "OUT" -> "结束"; else -> "结算区间" }, color = Muted, fontSize = 12.sp)
                                     }
-                                    HorizontalDivider(color = Color(0xFFF0F3F8))
                                 }
                             }
                         }
-                    }
-                    item {
-                        OutlinedButton(onClick = {
-                            loggedIn = false
-                            configUnlocked = false
-                            prefs.edit().putBoolean("loggedIn", false).apply()
-                            message = "已退出登录"
-                        }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Logout, null); Spacer(Modifier.width(8.dp)); Text("退出登录") }
                     }
                 }
             }
