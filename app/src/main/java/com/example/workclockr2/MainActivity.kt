@@ -180,7 +180,7 @@ fun WorkClockApp(context: Context) {
 
     fun saveConfig() {
         prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2")
-            .putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).apply()
+            .putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).commit()
         showSettings = false
         scope.launch {
             if (ssid.isBlank()) {
@@ -269,7 +269,7 @@ fun WorkClockApp(context: Context) {
                             configUnlocked = false
                             showAdminConfigAuth = false
                             adminConfigPassword = ""
-                            prefs.edit().putBoolean("loggedIn", false).apply()
+                            prefs.edit().putBoolean("loggedIn", false).commit()
                             punchList = emptyList()
                             message = "已退出登录"
                         },
@@ -311,7 +311,7 @@ fun WorkClockApp(context: Context) {
                                 else {
                                     employeeId = emp.employeeId; employeeName = emp.displayName; role = emp.role
                                     loggedIn = true; needChangePassword = emp.mustChangePassword
-                                    prefs.edit().putString("employee", employeeId).putString("name", employeeName).putString("role", role).putBoolean("loggedIn", true).apply()
+                                    prefs.edit().putString("employee", employeeId).putString("name", employeeName).putString("role", role).putBoolean("loggedIn", true).commit()
                                     try {
                                         punchList = store.readPunchesAsync(monthKey).filter { it.employeeId == employeeId }
                                         val todayKey = LocalDate.now().toString()
@@ -356,7 +356,7 @@ fun WorkClockApp(context: Context) {
                             finally { busy = false }
                         }
                     }, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "保存中…" else "保存新密码") }
-                    TextButton(onClick = { loggedIn = false; configUnlocked = false; prefs.edit().putBoolean("loggedIn", false).apply() }) { Text("退出登录") }
+                    TextButton(onClick = { loggedIn = false; configUnlocked = false; prefs.edit().putBoolean("loggedIn", false).commit() }) { Text("退出登录") }
                 }
             } else if (selectedSummaryEmployee != null && role == "admin") {
                 val emp = selectedSummaryEmployee!!
