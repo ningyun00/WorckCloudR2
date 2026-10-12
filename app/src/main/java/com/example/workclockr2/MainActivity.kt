@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import java.time.*
 import java.time.format.DateTimeFormatter
@@ -136,8 +138,18 @@ fun WorkClockApp(context: Context) {
                 punchList = saved.filter { it.employeeId == employeeId }
                 status = when(type) { "IN" -> "已上班"; "OUT" -> "已下班"; else -> "临时下班已记录" }
                 message = "$status · 已保存并验证 · ${ZonedDateTime.now().format(fmt)}"
-            } catch (e: Exception) {
-                message = "打卡未确认保存：${e.message ?: "请检查 R2 配置与网络"}"
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                val detail = buildString {
+                    append(t.javaClass.name)
+                    append(": ")
+                    append(t.message ?: "无错误消息")
+                    t.cause?.let { append("\\n原因："); append(it.javaClass.name); append(": "); append(it.message ?: "") }
+                }
+                Log.e("WorkClockPunch", "打卡失败，阶段：R2 读取/创建/写入/回读", t)
+                prefs.edit().putString("last_punch_error", detail.take(1800))
+                    .putString("last_punch_error_time", ZonedDateTime.now().toString()).apply()
+                message = "打卡失败（已保存诊断）：${detail.take(220)}"
             } finally { busy = false }
         }
     }
