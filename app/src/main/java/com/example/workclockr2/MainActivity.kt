@@ -77,6 +77,9 @@ fun WorkClockApp(context: Context) {
     var selectedDay by remember { mutableStateOf(LocalDate.now()) }
     var status by remember { mutableStateOf("尚未打卡") }
     var message by remember { mutableStateOf("") }
+    var showMessageDialog by remember { mutableStateOf(false) }
+    var hintExpanded by remember { mutableStateOf(false) }
+    LaunchedEffect(message) { if (message.isNotBlank()) showMessageDialog = true }
     var connectionTest by remember { mutableStateOf("") }
     var showAdminConfigAuth by remember { mutableStateOf(false) }
     var adminConfigPassword by remember { mutableStateOf("") }
@@ -230,7 +233,6 @@ fun WorkClockApp(context: Context) {
                             finally { busy = false }
                         }
                     }, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "请稍候…" else "登录") }
-                    if (message.isNotBlank()) Text(message, color = Blue, modifier = Modifier.padding(top = 12.dp))
                 }
             } else if (needChangePassword) {
                 Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center) {
@@ -251,7 +253,6 @@ fun WorkClockApp(context: Context) {
                             finally { busy = false }
                         }
                     }, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "保存中…" else "保存新密码") }
-                    if (message.isNotBlank()) Text(message, color = Blue)
                     TextButton(onClick = { loggedIn = false; configUnlocked = false; prefs.edit().putBoolean("loggedIn", false).apply() }) { Text("退出登录") }
                 }
             } else if (showAdminSummary && role == "admin") {
@@ -354,6 +355,27 @@ fun WorkClockApp(context: Context) {
                     )
                 }, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     item {
+                        if (message.isNotBlank()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable { hintExpanded = !hintExpanded },
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White)
+                            ) {
+                                Row(Modifier.fillMaxWidth().heightIn(min = 12.dp).padding(horizontal = 8.dp, vertical = if (hintExpanded) 8.dp else 0.dp),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        message,
+                                        color = Blue,
+                                        fontSize = 11.sp,
+                                        maxLines = if (hintExpanded) Int.MAX_VALUE else 1,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(if (hintExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = if (hintExpanded) "收起提示" else "展开提示", tint = Muted, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                    item {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             TextButton(onClick = { doPunch("TEMP_OUT") }, enabled = !busy) {
                                 Icon(Icons.Default.PauseCircle, null); Spacer(Modifier.width(4.dp)); Text("临时下班")
@@ -433,10 +455,18 @@ fun WorkClockApp(context: Context) {
                             prefs.edit().putBoolean("loggedIn", false).apply()
                             message = "已退出登录"
                         }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Logout, null); Spacer(Modifier.width(8.dp)); Text("退出登录") }
-                        if (message.isNotBlank()) Text(message, color = Blue, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
                     }
                 }
             }
+        }
+        if (showMessageDialog && message.isNotBlank()) {
+            AlertDialog(
+                onDismissRequest = { showMessageDialog = false },
+                title = { Text("提示") },
+                text = { Text(message) },
+                confirmButton = { TextButton(onClick = { showMessageDialog = false }) { Text("确定") } },
+                dismissButton = { TextButton(onClick = { showMessageDialog = false }) { Text("取消") } }
+            )
         }
         if (showSettings) {
             AlertDialog(onDismissRequest = { if (configured) { showSettings = false; configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = "" } }, title = { Text(if (role == "admin" && loggedIn) "管理设置" else "Cloudflare R2 配置") },
