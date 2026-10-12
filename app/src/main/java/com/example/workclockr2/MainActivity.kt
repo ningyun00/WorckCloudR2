@@ -282,13 +282,14 @@ fun WorkClockApp(context: Context) {
                                 summaryPunches = store.readPunchesAsync(monthKey)
                             } catch (e: Exception) {
                                 summaryError = "读取合计失败：${e.message ?: e.javaClass.simpleName}"
+                                message = summaryError
                             } finally { summaryLoading = false }
                         }
                     }, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(8.dp))
                         Text(if (summaryLoading) "正在读取…" else "刷新全员数据")
                     }
-                    if (summaryError.isNotBlank()) Text(summaryError, color = Color(0xFFD34B54), modifier = Modifier.padding(vertical = 8.dp))
+
                     val totalHours = summaryEmployees.sumOf { emp ->
                         calculateHours(summaryPunches.filter { it.employeeId == emp.employeeId && it.day.startsWith(monthKey) })
                     }
@@ -346,6 +347,7 @@ fun WorkClockApp(context: Context) {
                                         summaryPunches = store.readPunchesAsync(monthKey)
                                     } catch (e: Exception) {
                                         summaryError = "读取合计失败：${e.message ?: e.javaClass.simpleName}"
+                                        message = summaryError
                                     } finally { summaryLoading = false }
                                 }
                             }
@@ -361,7 +363,7 @@ fun WorkClockApp(context: Context) {
                                 shape = RoundedCornerShape(10.dp),
                                 colors = CardDefaults.cardColors(containerColor = Color.White)
                             ) {
-                                Row(Modifier.fillMaxWidth().heightIn(min = 12.dp).padding(horizontal = 8.dp, vertical = if (hintExpanded) 8.dp else 0.dp),
+                                Row(Modifier.fillMaxWidth().heightIn(min = 16.dp).padding(horizontal = 8.dp, vertical = if (hintExpanded) 8.dp else 0.dp),
                                     verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         message,
@@ -500,7 +502,6 @@ fun WorkClockApp(context: Context) {
                                         OutlinedTextField(ssid, { if (role == "admin" || !loggedIn) ssid = it }, label = { Text("指定 WiFi 名称（管理员必填）") }, supportingText = { Text("未设置指定 Wi-Fi 时，所有账号均不能打卡。") }, singleLine = true, enabled = role == "admin" || !loggedIn)
                                     }
                                 }
-                                if (connectionTest.isNotBlank()) Text(connectionTest, color = if (connectionTest.startsWith("连接成功")) Color(0xFF16865C) else Blue, fontSize = 12.sp)
                                 prefs.getString("last_punch_error", null)?.let { savedError ->
                                     Text("上次打卡诊断（可复制反馈）：$savedError", color = Color(0xFFD34B54), fontSize = 11.sp)
                                     prefs.getString("last_punch_error_time", null)?.let { Text("错误时间：$it", color = Muted, fontSize = 10.sp) }
@@ -543,7 +544,6 @@ fun WorkClockApp(context: Context) {
                                         finally { creatingEmployee = false }
                                     }
                                 }) { Text(if (creatingEmployee) "正在创建…" else "创建并分配账号") }
-                                if (message.isNotBlank()) Text(message, color = Blue, fontSize = 12.sp)
                             }
                         }
                     }
@@ -564,7 +564,7 @@ fun WorkClockApp(context: Context) {
                                 testingConnection = true; connectionTest = "正在测试连接…"
                                 try { connectionTest = R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid)).testConnectionAsync() }
                                 catch (e: Exception) { connectionTest = "测试异常：${e.message ?: e.javaClass.simpleName}" }
-                                finally { testingConnection = false }
+                                finally { testingConnection = false; message = connectionTest }
                             }
                         }) { Text(if (testingConnection) "正在测试…" else "测试连接") }
                         if (configured) TextButton(onClick = { showSettings = false; configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = ""; configAuthMessage = "" }) { Text("取消") }
