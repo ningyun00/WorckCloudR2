@@ -128,6 +128,7 @@ fun WorkClockApp(context: Context) {
     var profileAvatar by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     var profileLoading by remember { mutableStateOf(false) }
     var profileMessage by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
     val avatarPicker = androidx.activity.compose.rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) scope.launch {
             profileLoading = true
@@ -161,7 +162,6 @@ fun WorkClockApp(context: Context) {
     var summaryError by remember { mutableStateOf("") }
     var selectedSummaryEmployee by remember { mutableStateOf<Employee?>(null) }
     var selectedSummaryDay by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
     val canNavigateBack = showAdminConfigAuth || showSettings || needChangePassword ||
         (role == "admin" && (selectedSummaryDay != null || selectedSummaryEmployee != null || showAdminSummary || showMakeUpRecords || editingMakeUpGroup != null))
     BackHandler(enabled = canNavigateBack) {
