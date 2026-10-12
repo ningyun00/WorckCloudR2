@@ -105,6 +105,7 @@ fun WorkClockApp(context: Context) {
     var summaryEmployees by remember { mutableStateOf(listOf<Employee>()) }
     var summaryPunches by remember { mutableStateOf(listOf<Punch>()) }
     var summaryError by remember { mutableStateOf("") }
+    var selectedSummaryEmployee by remember { mutableStateOf<Employee?>(null) }
     val scope = rememberCoroutineScope()
     val configured = account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()
     DisposableEffect(context) {
@@ -334,6 +335,62 @@ fun WorkClockApp(context: Context) {
                     }, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "保存中…" else "保存新密码") }
                     TextButton(onClick = { loggedIn = false; configUnlocked = false; prefs.edit().putBoolean("loggedIn", false).apply() }) { Text("退出登录") }
                 }
+            } else if (selectedSummaryEmployee != null && role == "admin") {
+                val emp = selectedSummaryEmployee!!
+                val empPunches = summaryPunches.filter { it.employeeId == emp.employeeId && it.day.startsWith(monthKey) }
+                val empDays = empPunches.map { it.day }.distinct().sortedDescending()
+                val empTotalHours = empPunches.groupBy { it.day }.values.sumOf { calculateHours(it) }
+                Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { selectedSummaryEmployee = null }) { Icon(Icons.Default.ArrowBack, null); Text("返回全员") }
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(emp.displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Ink)
+                            Text("${emp.employeeId} · ${if (emp.role == "admin") "管理员" else "员工"} · 本月报表", color = Muted, fontSize = 12.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                            Column(Modifier.padding(14.dp)) {
+                                Text("本月总工时", color = Muted, fontSize = 12.sp)
+                                Text(String.format("%.2f 小时", empTotalHours), color = Blue, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                            }
+                        }
+                        Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                            Column(Modifier.padding(14.dp)) {
+                                Text("打卡天数 / 次数", color = Muted, fontSize = 12.sp)
+                                Text("${empDays.size} 天 / ${empPunches.size} 次", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text("每日工时报表", color = Ink, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    if (empDays.isEmpty()) {
+                        Text("本月暂无打卡记录", color = Muted, modifier = Modifier.padding(vertical = 12.dp))
+                    } else {
+                        LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(empDays) { day ->
+                                val dayItems = empPunches.filter { it.day == day }.sortedBy { it.at }
+                                Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(12.dp)) {
+                                    Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                            Text(day, color = Ink, fontWeight = FontWeight.Bold)
+                                            Text(String.format("%.2f 小时", calculateHours(dayItems)), color = Blue, fontWeight = FontWeight.Bold)
+                                        }
+                                        dayItems.forEach { punch ->
+                                            Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                Text(when(punch.type) { "IN" -> "上班"; "OUT" -> "下班"; else -> "临时下班" }, color = Muted, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                                                Text(punch.at.replace("T", " ").take(19), color = Muted, fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             } else if (showAdminSummary && role == "admin") {
                 Column(Modifier.fillMaxSize().padding(padding).pointerInput(role) {
                     var drag = 0f
@@ -392,14 +449,21 @@ fun WorkClockApp(context: Context) {
                             items(summaryEmployees.size) { index ->
                                 val emp = summaryEmployees[index]
                                 val empPunches = summaryPunches.filter { it.employeeId == emp.employeeId && it.day.startsWith(monthKey) }
-                                Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().clickable { selectedSummaryEmployee = emp },
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                                ) {
                                     Column(Modifier.fillMaxWidth().padding(16.dp)) {
                                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                             Column(Modifier.weight(1f)) {
                                                 Text(emp.displayName, color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                                 Text("${emp.employeeId} · ${if (emp.role == "admin") "管理员" else "员工"}", color = Muted, fontSize = 12.sp)
                                             }
-                                            Text(String.format("%.2f 小时", calculateHours(empPunches)), color = Blue, fontWeight = FontWeight.Bold)
+                                            Column(horizontalAlignment = Alignment.End) {
+                                                Text(String.format("%.2f 小时", calculateHours(empPunches)), color = Blue, fontWeight = FontWeight.Bold)
+                                                Text("查看报表 ›", color = Blue, fontSize = 11.sp)
+                                            }
                                         }
                                         Text("打卡 ${empPunches.size} 次 · ${empPunches.map { it.day }.distinct().size} 天", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                                     }
