@@ -315,10 +315,9 @@ fun WorkClockApp(context: Context) {
         }
     }
     val qrScanLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
+        contract = com.journeyapps.barcodescanner.ScanContract()
     ) { result ->
-        val scanResult = com.journeyapps.barcodescanner.IntentIntegrator.parseActivityResult(result.resultCode, result.data)
-        val payload = scanResult?.contents
+        val payload: String? = result.contents
         if (payload.isNullOrBlank()) {
             qrScanMessage = "未读取到二维码内容，请对准管理员提供的 R2 配置二维码重试。"
         } else {
@@ -341,14 +340,12 @@ fun WorkClockApp(context: Context) {
     fun scanR2Qr() {
         try {
             qrScanMessage = "正在打开本地二维码扫描器…"
-            val activity = context as? android.app.Activity ?: error("无法启动扫码界面")
-            val intent = com.journeyapps.barcodescanner.IntentIntegrator(activity)
-                .setDesiredBarcodeFormats(com.journeyapps.barcodescanner.IntentIntegrator.QR_CODE)
+            val options = com.journeyapps.barcodescanner.ScanOptions()
+                .setDesiredBarcodeFormats(com.journeyapps.barcode scanner.ScanOptions.QR_CODE)
                 .setPrompt("扫描管理员提供的 R2 配置二维码")
                 .setBeepEnabled(false)
                 .setOrientationLocked(false)
-                .createScanIntent()
-            qrScanLauncher.launch(intent)
+            qrScanLauncher.launch(options)
         } catch (e: Exception) {
             qrScanMessage = "无法启动扫码器：" + (e.message ?: e.javaClass.simpleName) + "。请检查相机权限，或使用“手动配置”。"
         }
