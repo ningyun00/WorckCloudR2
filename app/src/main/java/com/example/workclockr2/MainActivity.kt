@@ -132,6 +132,7 @@ fun WorkClockApp(context: Context) {
     var profileName by remember { mutableStateOf(prefs.getString("name", "员工") ?: "员工") }
     var profileBackground by remember { mutableIntStateOf(prefs.getInt("profile_background", 0)) }
     var profileAvatar by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var profileBackgroundImage by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     var profileLoading by remember { mutableStateOf(false) }
     var profileMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
@@ -150,6 +151,42 @@ fun WorkClockApp(context: Context) {
                 profileMessage = "头像已上传并保存到 R2。"
             } catch (e: Exception) { profileMessage = "头像上传失败：" + (e.message ?: e.javaClass.simpleName) }
             finally { profileLoading = false }
+        }
+    }
+    val backgroundPicker = androidx.activity.compose.rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) scope.launch {
+            profileLoading = true
+            try {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("无法读取背景图片")
+                require(bytes.size <= 8 * 1024 * 1024) { "背景图片不能超过 8 MB" }
+                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: error("图片格式不支持")
+                val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                val key = "profiles/backgrounds/" + employeeId + ".jpg"
+                store.writeBinaryAsync(key, bytes, "image/jpeg")
+                profileBackgroundImage = bitmap
+                profileMessage = "背景图片已上传并保存到 R2。"
+            } catch (e: Exception) { profileMessage = "背景图片上传失败：" + (e.message ?: e.javaClass.simpleName) }
+            finally { profileLoading = false }
+        }
+    }
+    LaunchedEffect(showProfile, employeeId, configured) {
+        if (showProfile && employeeId.isNotBlank() && configured) {
+            try {
+                val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                val bytes = store.readBinaryAsync("profiles/backgrounds/" + employeeId + ".jpg")
+                profileBackgroundImage = bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                val profile = store.readProfileAsync(employeeId)
+                if (profile != null) {
+                    profileName = profile.name
+                    profileGender = profile.gender
+                    profileAge = profile.age
+                    profileBackground = profile.background
+                    val avatarBytes = store.readBinaryAsync(profile.avatarKey)
+                    profileAvatar = avatarBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                }
+            } catch (e: Exception) {
+                Log.e("WorkClockProfile", "读取个人背景/资料失败", e)
+            }
         }
     }
     var showMakeUpRecords by remember { mutableStateOf(false) }
@@ -608,8 +645,13 @@ fun WorkClockApp(context: Context) {
                     }
                 }
             } else if (showProfile) {
-                val backgrounds = listOf(Color(0xFFF2F0FF), Color(0xFFEAF7F4), Color(0xFFFFF1E8), Color(0xFFEAF2FF))
-                Column(Modifier.fillMaxSize().padding(padding).background(backgrounds[profileBackground.coerceIn(0, 3)]).verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.fillMaxSize().padding(padding)) {
+                    if (profileBackgroundImage != null) {
+                        Image(profileBackgroundImage!!.asImageBitmap(), "个人空间背景", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    } else {
+                        Box(Modifier.fillMaxSize().background(Color.Transparent))
+                    }
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = { showProfile = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回打卡") }
                         Spacer(Modifier.weight(1f)); Icon(Icons.Default.AutoAwesome, null, tint = Blue)
@@ -635,9 +677,10 @@ fun WorkClockApp(context: Context) {
                                 listOf("男", "女", "未设置").forEach { g -> FilterChip(selected = profileGender == g, onClick = { profileGender = g }, label = { Text(g) }) }
                             }
                             OutlinedTextField(profileAge, { profileAge = it.filter(Char::isDigit).take(3) }, label = { Text("年龄") }, suffix = { Text("岁") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            Text("页面背景", color = Ink, fontWeight = FontWeight.SemiBold)
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                backgrounds.forEachIndexed { i, c -> Box(Modifier.weight(1f).height(42.dp).background(c, RoundedCornerShape(12.dp)).clickable { profileBackground = i }, contentAlignment = Alignment.Center) { if (profileBackground == i) Icon(Icons.Default.CheckCircle, null, tint = Blue) } }
+                            Text("个人空间背景图片", color = Ink, fontWeight = FontWeight.SemiBold)
+                            Text("上传的图片将作为个人空间背景，并按工号保存到 R2。", color = Muted, fontSize = 12.sp)
+                            OutlinedButton(enabled = !profileLoading, onClick = { backgroundPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
+                                Icon(Icons.Default.Image, null); Spacer(Modifier.width(8.dp)); Text(if (profileLoading) "处理中…" else "上传/更换背景图片")
                             }
                             Button(enabled = !profileLoading && profileName.isNotBlank() && (profileAge.isBlank() || (profileAge.toIntOrNull() ?: 999) <= 120), onClick = {
                                 scope.launch {
@@ -645,7 +688,7 @@ fun WorkClockApp(context: Context) {
                                     try {
                                         val store = R2Store(R2Config(account, bucket, access, secret, ssid))
                                         store.writeProfileAsync(ProfileData(employeeId, profileName.trim(), profileGender, profileAge, "profiles/avatars/" + employeeId + ".jpg", profileBackground))
-                                        prefs.edit().putString("name", profileName.trim()).putInt("profile_background", profileBackground).apply()
+                                        prefs.edit().putString("name", profileName.trim()).apply()
                                         employeeName = profileName.trim()
                                         profileMessage = "个人资料已保存到 R2。"
                                     } catch (e: Exception) { profileMessage = "保存失败：" + (e.message ?: e.javaClass.simpleName) }
@@ -657,6 +700,7 @@ fun WorkClockApp(context: Context) {
                         }
                     }
                     Text("轻松工作，自信生活 ✨", color = Muted, fontSize = 12.sp)
+                    }
                 }
             } else if (showMakeUpRecords && role == "admin") {
                 val recordGroups = makeUpQueryPunches
