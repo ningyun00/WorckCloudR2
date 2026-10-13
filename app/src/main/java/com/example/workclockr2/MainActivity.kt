@@ -13,7 +13,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.background
@@ -296,25 +295,42 @@ fun WorkClockApp(context: Context) {
             } finally { busy = false }
         }
     }
-    fun scanR2Qr() {
-        qrScanMessage = "正在打开扫码器…"
-        GmsBarcodeScanning.getClient(context).startScan()
-            .addOnSuccessListener { barcode ->
-                try {
-                    val payload = barcode.rawValue ?: error("二维码没有内容")
-                    val json = com.google.gson.JsonParser.parseString(payload).asJsonObject
-                    account = json.get("AccountID")?.asString ?: json.get("account")?.asString ?: json.get("accountId")?.asString ?: ""
-                    access = json.get("AccessKeyID")?.asString ?: json.get("access")?.asString ?: json.get("accessKey")?.asString ?: ""
-                    secret = json.get("SecretAccessKey")?.asString ?: json.get("secret")?.asString ?: json.get("secretKey")?.asString ?: ""
-                    ssid = json.get("SSID")?.asString ?: json.get("ssid")?.asString ?: json.get("allowedSsid")?.asString ?: ""
-                    require(account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { "二维码缺少 account、access 或 secret 字段" }
-                    prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2").putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).putBoolean("qr_config_completed", true).commit()
-                    qrConfigCompleted = true
-                    configMethod = "手动配置"
-                    qrScanMessage = "扫码成功，已切换为手动配置。请确认信息后点击保存配置。"
-                } catch (e: Exception) { qrScanMessage = "二维码格式不正确：" + (e.message ?: "请使用 R2 配置二维码") }
+    val qrScanLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = com.journeyapps.barcodescanner.ScanContract()
+    ) { result ->
+        val payload: String? = result.contents
+        if (payload.isNullOrBlank()) {
+            qrScanMessage = "未读取到二维码内容，请对准管理员提供的 R2 配置二维码重试。"
+        } else {
+            try {
+                val json = com.google.gson.JsonParser.parseString(payload).asJsonObject
+                account = json.get("AccountID")?.asString ?: json.get("account")?.asString ?: json.get("accountId")?.asString ?: ""
+                access = json.get("AccessKeyID")?.asString ?: json.get("access")?.asString ?: json.get("accessKey")?.asString ?: ""
+                secret = json.get("SecretAccessKey")?.asString ?: json.get("secret")?.asString ?: json.get("secretKey")?.asString ?: ""
+                ssid = json.get("SSID")?.asString ?: json.get("ssid")?.asString ?: json.get("allowedSsid")?.asString ?: ""
+                require(account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { "二维码缺少 account、access 或 secret 字段" }
+                prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2").putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).putBoolean("qr_config_completed", true).commit()
+                qrConfigCompleted = true
+                configMethod = "手动配置"
+                qrScanMessage = "扫码成功，已读取 R2 配置。请确认信息后点击保存配置。"
+            } catch (e: Exception) {
+                qrScanMessage = "二维码格式不正确：" + (e.message ?: "请使用 R2 配置二维码")
             }
-            .addOnFailureListener { error -> qrScanMessage = "扫码取消或失败：" + error.toString() }
+        }
+    }
+    fun scanR2Qr() {
+        try {
+            qrScanMessage = "正在打开本地二维码扫描器…"
+            val options = com.journeyapps.barcodescanner.ScanOptions()
+                .setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE)
+                .setPrompt("扫描管理员提供的 R2 配置二维码")
+                .setBeepEnabled(false)
+                .setCaptureActivity(PortraitCaptureActivity::class.java)
+                .setOrientationLocked(true)
+            qrScanLauncher.launch(options)
+        } catch (e: Exception) {
+            qrScanMessage = "无法启动扫码器：" + (e.message ?: e.javaClass.simpleName) + "。请检查相机权限，或使用“手动配置”。"
+        }
     }
     fun doPunch(type: String) {
         if (!configured) { showSettings = true; message = "请先完成 R2 配置"; return }
