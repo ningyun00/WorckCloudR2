@@ -13,7 +13,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.background
@@ -315,35 +314,44 @@ fun WorkClockApp(context: Context) {
             } finally { busy = false }
         }
     }
+    val qrScanLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val scanResult = com.journeyapps.barcodescanner.IntentIntegrator.parseActivityResult(result.resultCode, result.data)
+        val payload = scanResult?.contents
+        if (payload.isNullOrBlank()) {
+            qrScanMessage = "未读取到二维码内容，请对准管理员提供的 R2 配置二维码重试。"
+        } else {
+            try {
+                val json = com.google.gson.JsonParser.parseString(payload).asJsonObject
+                account = json.get("AccountID")?.asString ?: json.get("account")?.asString ?: json.get("accountId")?.asString ?: ""
+                access = json.get("AccessKeyID")?.asString ?: json.get("access")?.asString ?: json.get("accessKey")?.asString ?: ""
+                secret = json.get("SecretAccessKey")?.asString ?: json.get("secret")?.asString ?: json.get("secretKey")?.asString ?: ""
+                ssid = json.get("SSID")?.asString ?: json.get("ssid")?.asString ?: json.get("allowedSsid")?.asString ?: ""
+                require(account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { "二维码缺少 account、access 或 secret 字段" }
+                prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2").putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).putBoolean("qr_config_completed", true).commit()
+                qrConfigCompleted = true
+                configMethod = "手动配置"
+                qrScanMessage = "扫码成功，已读取 R2 配置。请确认信息后点击保存配置。"
+            } catch (e: Exception) {
+                qrScanMessage = "二维码格式不正确：" + (e.message ?: "请使用 R2 配置二维码")
+            }
+        }
+    }
     fun scanR2Qr() {
-        qrScanMessage = "正在打开扫码器…"
-        GmsBarcodeScanning.getClient(context).startScan()
-            .addOnSuccessListener { barcode ->
-                try {
-                    val payload = barcode.rawValue ?: error("二维码没有内容")
-                    val json = com.google.gson.JsonParser.parseString(payload).asJsonObject
-                    account = json.get("AccountID")?.asString ?: json.get("account")?.asString ?: json.get("accountId")?.asString ?: ""
-                    access = json.get("AccessKeyID")?.asString ?: json.get("access")?.asString ?: json.get("accessKey")?.asString ?: ""
-                    secret = json.get("SecretAccessKey")?.asString ?: json.get("secret")?.asString ?: json.get("secretKey")?.asString ?: ""
-                    ssid = json.get("SSID")?.asString ?: json.get("ssid")?.asString ?: json.get("allowedSsid")?.asString ?: ""
-                    require(account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) { "二维码缺少 account、access 或 secret 字段" }
-                    prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2").putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).putBoolean("qr_config_completed", true).commit()
-                    qrConfigCompleted = true
-                    configMethod = "手动配置"
-                    qrScanMessage = "扫码成功，已切换为手动配置。请确认信息后点击保存配置。"
-                } catch (e: Exception) { qrScanMessage = "二维码格式不正确：" + (e.message ?: "请使用 R2 配置二维码") }
-            }
-            .addOnFailureListener { error ->
-                val status = (error as? com.google.android.gms.common.api.ApiException)?.statusCode
-                qrScanMessage = when {
-                    error is com.google.android.gms.common.api.ApiException && status == 13 ->
-                        "扫码器启动失败（错误码 13）。请检查 Google Play 服务是否正常、网络是否可用，并更新 Google Play 服务后重试；也可以切换到“手动配置”。"
-                    error is com.google.android.gms.common.api.ApiException ->
-                        "扫码器失败（错误码 ${status}）：${error.localizedMessage ?: error.javaClass.simpleName}。请更新 Google Play 服务或使用“手动配置”。"
-                    else ->
-                        "扫码器失败：${error.localizedMessage ?: error.javaClass.simpleName}。请检查 Google Play 服务和网络，或使用“手动配置”。"
-                }
-            }
+        try {
+            qrScanMessage = "正在打开本地二维码扫描器…"
+            val activity = context as? android.app.Activity ?: error("无法启动扫码界面")
+            val intent = com.journeyapps.barcodescanner.IntentIntegrator(activity)
+                .setDesiredBarcodeFormats(com.journeyapps.barcodescanner.IntentIntegrator.QR_CODE)
+                .setPrompt("扫描管理员提供的 R2 配置二维码")
+                .setBeepEnabled(false)
+                .setOrientationLocked(false)
+                .createScanIntent()
+            qrScanLauncher.launch(intent)
+        } catch (e: Exception) {
+            qrScanMessage = "无法启动扫码器：" + (e.message ?: e.javaClass.simpleName) + "。请检查相机权限，或使用“手动配置”。"
+        }
     }
     fun doPunch(type: String) {
         if (!configured) { showSettings = true; message = "请先完成 R2 配置"; return }
