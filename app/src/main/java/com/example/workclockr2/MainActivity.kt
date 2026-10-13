@@ -1164,11 +1164,11 @@ fun WorkClockApp(context: Context) {
                                                     val dayHours = calculateHours(punchList.filter { it.day == d.toString() })
                                                     val has = punchList.any { it.day == d.toString() }
                                                     Column(
-                                                        Modifier.weight(1f).background(if (d == selectedDay) Color(0xFFE5EEFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                                        Modifier.weight(1f).background(if (d == selectedDay) { if (darkMode) Color(0xFF263B55) else Color(0xFFE5EEFF) } else Color.Transparent, RoundedCornerShape(10.dp))
                                                             .clickable { selectedDay = d }.padding(vertical = 5.dp),
                                                         horizontalAlignment = Alignment.CenterHorizontally
                                                     ) {
-                                                        Text(d.dayOfMonth.toString(), color = themeInk, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                        Text(d.dayOfMonth.toString(), color = if (d == selectedDay) themeScheme.primary else themeInk, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                                         Spacer(Modifier.height(2.dp))
                                                         Text(if (has) String.format("%.1f", dayHours) else "—", color = if (has) Blue else themeMuted, fontSize = 9.sp, maxLines = 1)
                                                     }
@@ -1183,11 +1183,11 @@ fun WorkClockApp(context: Context) {
                                             val d = monday.plusDays(offset.toLong())
                                             val dayHours = calculateHours(punchList.filter { it.day == d.toString() })
                                             val has = punchList.any { it.day == d.toString() }
-                                            Column(Modifier.weight(1f).background(if (d == selectedDay) Color(0xFFE5EEFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                            Column(Modifier.weight(1f).background(if (d == selectedDay) { if (darkMode) Color(0xFF263B55) else Color(0xFFE5EEFF) } else Color.Transparent, RoundedCornerShape(10.dp))
                                                 .clickable { selectedDay = d }.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Text(listOf("一","二","三","四","五","六","日")[offset], color = themeMuted, fontSize = 10.sp)
                                                 Spacer(Modifier.height(4.dp))
-                                                Text(d.dayOfMonth.toString(), color = themeInk, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                Text(d.dayOfMonth.toString(), color = if (d == selectedDay) themeScheme.primary else themeInk, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                                 Spacer(Modifier.height(3.dp))
                                                 Text(if (has) String.format("%.1f", dayHours) else "—", color = if (has) Blue else themeMuted, fontSize = 9.sp, maxLines = 1)
                                             }
