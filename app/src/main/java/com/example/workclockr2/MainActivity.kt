@@ -1265,7 +1265,7 @@ fun WorkClockApp(context: Context) {
                             ) { DatePicker(state = datePickerState) }
                         }
                         makeUpSegments.forEachIndexed { index, segment ->
-                            Card(colors = CardDefaults.cardColors(containerColor = themeBackground)) {
+                            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background)) {
                                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text("时间段 ${index + 1}", fontWeight = FontWeight.Bold, color = themeInk)
@@ -1293,17 +1293,18 @@ fun WorkClockApp(context: Context) {
                                         val timePickerState = rememberTimePickerState(initialHour = initialTime.hour, initialMinute = initialTime.minute, is24Hour = true)
                                         AlertDialog(
                                             onDismissRequest = { showStartTimePicker = false; showEndTimePicker = false },
-                                            title = { Text(if (editingStart) "选择开始时间" else "选择结束时间") },
+                                            containerColor = themeBackground,
+                                            title = { Text(if (editingStart) "选择开始时间" else "选择结束时间", color = themeInk) },
                                             text = {
-                                                Surface(color = themeBackground, contentColor = themeInk, shape = RoundedCornerShape(20.dp)) {
+                                                Surface(color = MaterialTheme.colorScheme.background, contentColor = themeInk, shape = RoundedCornerShape(20.dp)) {
                                                     TimePicker(
                                                         state = timePickerState,
                                                         colors = TimePickerDefaults.colors(
-                                                            containerColor = themeBackground,
-                                                            clockDialColor = themeBackground,
+                                                            containerColor = MaterialTheme.colorScheme.background,
+                                                            clockDialColor = MaterialTheme.colorScheme.background,
                                                             selectorColor = MaterialTheme.colorScheme.primary,
                                                             timeSelectorSelectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                                            timeSelectorUnselectedContainerColor = themeBackground,
+                                                            timeSelectorUnselectedContainerColor = MaterialTheme.colorScheme.background,
                                                             timeSelectorSelectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                                             timeSelectorUnselectedContentColor = themeInk
                                                         )
