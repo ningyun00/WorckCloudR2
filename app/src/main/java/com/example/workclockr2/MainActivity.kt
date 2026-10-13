@@ -33,6 +33,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
@@ -660,18 +661,21 @@ fun WorkClockApp(context: Context) {
                     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
                         Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Box(
-                                Modifier.size(width = 124.dp, height = 148.dp)
-                                    .background(Color(0xFFE5E9FF), RoundedCornerShape(18.dp))
+                                Modifier.size(124.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(if (profileBackgroundImage == null) Color.Transparent else Color.Transparent)
                                     .clickable { if (profileAvatar != null) showAvatarPreview = true },
                                 contentAlignment = Alignment.Center
                             ) {
+                                if (profileBackgroundImage != null) {
+                                    Image(profileBackgroundImage!!.asImageBitmap(), "头像背景图片", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                } else {
+                                    Box(Modifier.fillMaxSize().background(Color.Transparent))
+                                }
                                 if (profileAvatar != null) {
                                     Image(profileAvatar!!.asImageBitmap(), "个人头像，点击放大", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                } else if (profileBackgroundImage != null) {
-                                    Image(profileBackgroundImage!!.asImageBitmap(), "头像背景图片", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                    Icon(Icons.Default.AccountCircle, null, tint = Color.White, modifier = Modifier.size(82.dp))
                                 } else {
-                                    Icon(Icons.Default.AccountCircle, null, tint = Blue, modifier = Modifier.size(100.dp))
+                                    Icon(Icons.Default.AccountCircle, null, tint = if (profileBackgroundImage != null) Color.White else Blue, modifier = Modifier.size(82.dp))
                                 }
                             }
                             if (showAvatarPreview && profileAvatar != null) {
