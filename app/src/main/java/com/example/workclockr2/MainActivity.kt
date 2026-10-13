@@ -344,7 +344,8 @@ fun WorkClockApp(context: Context) {
                 .setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE)
                 .setPrompt("扫描管理员提供的 R2 配置二维码")
                 .setBeepEnabled(false)
-                .setOrientationLocked(false)
+                .setCaptureActivity(PortraitCaptureActivity::class.java)
+                .setOrientationLocked(true)
             qrScanLauncher.launch(options)
         } catch (e: Exception) {
             qrScanMessage = "无法启动扫码器：" + (e.message ?: e.javaClass.simpleName) + "。请检查相机权限，或使用“手动配置”。"
