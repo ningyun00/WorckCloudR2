@@ -169,8 +169,8 @@ fun WorkClockApp(context: Context) {
             finally { profileLoading = false }
         }
     }
-    LaunchedEffect(showProfile, employeeId, configured) {
-        if (showProfile && employeeId.isNotBlank() && configured) {
+    LaunchedEffect(showProfile, employeeId, account, access, secret, ssid) {
+        if (showProfile && employeeId.isNotBlank() && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) {
             try {
                 val store = R2Store(R2Config(account, bucket, access, secret, ssid))
                 val bytes = store.readBinaryAsync("profiles/backgrounds/" + employeeId + ".jpg")
