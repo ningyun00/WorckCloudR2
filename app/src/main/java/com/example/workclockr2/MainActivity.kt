@@ -1265,7 +1265,7 @@ fun WorkClockApp(context: Context) {
                             ) { DatePicker(state = datePickerState) }
                         }
                         makeUpSegments.forEachIndexed { index, segment ->
-                            Card(colors = CardDefaults.cardColors(containerColor = themeSurface)) {
+                            Card(colors = CardDefaults.cardColors(containerColor = themeBackground)) {
                                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text("时间段 ${index + 1}", fontWeight = FontWeight.Bold, color = themeInk)
@@ -1295,11 +1295,11 @@ fun WorkClockApp(context: Context) {
                                             onDismissRequest = { showStartTimePicker = false; showEndTimePicker = false },
                                             title = { Text(if (editingStart) "选择开始时间" else "选择结束时间") },
                                             text = {
-                                                Surface(color = themeSurface, contentColor = themeInk, shape = RoundedCornerShape(20.dp)) {
+                                                Surface(color = themeBackground, contentColor = themeInk, shape = RoundedCornerShape(20.dp)) {
                                                     TimePicker(
                                                         state = timePickerState,
                                                         colors = TimePickerDefaults.colors(
-                                                            containerColor = themeSurface,
+                                                            containerColor = themeBackground,
                                                             clockDialColor = themeBackground,
                                                             selectorColor = MaterialTheme.colorScheme.primary,
                                                             timeSelectorSelectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
