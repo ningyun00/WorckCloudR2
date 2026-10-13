@@ -128,6 +128,7 @@ fun WorkClockApp(context: Context) {
     var profileBackground by remember { mutableIntStateOf(prefs.getInt("profile_background", 0)) }
     var profileAvatar by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     var profileLoading by remember { mutableStateOf(false) }
+    var showAvatarPreview by remember { mutableStateOf(false) }
     var profileMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val avatarPicker = androidx.activity.compose.rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -582,13 +583,13 @@ fun WorkClockApp(context: Context) {
                                             val hasPunch = dayItems.isNotEmpty()
                                             Card(
                                                 modifier = Modifier.weight(1f).height(66.dp).clickable { selectedSummaryDay = dayKey },
-                                                colors = CardDefaults.cardColors(containerColor = if (hasPunch) Color(0xFFEAF2FF) else themeSurface),
+                                                colors = CardDefaults.cardColors(containerColor = when { selectedSummaryDay == dayKey && darkMode -> Color(0xFF315A91); selectedSummaryDay == dayKey -> Color(0xFFDCE8FF); hasPunch && darkMode -> Color(0xFF263B55); hasPunch -> Color(0xFFEAF2FF); else -> themeSurface }),
                                                 shape = RoundedCornerShape(8.dp)
                                             ) {
                                                 Column(Modifier.fillMaxSize().padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally,
                                                     verticalArrangement = Arrangement.Center) {
-                                                    Text(date.dayOfMonth.toString(), color = if (hasPunch) Blue else themeInk, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                                    if (hasPunch) Text(String.format("%.1f小时", dayHours), color = Blue, fontSize = 9.sp, maxLines = 1)
+                                                    Text(date.dayOfMonth.toString(), color = when { selectedSummaryDay == dayKey && darkMode -> Color.White; selectedSummaryDay == dayKey -> Color(0xFF17345D); hasPunch && darkMode -> Color(0xFF9CC4FF); hasPunch -> Blue; else -> themeInk }, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                    if (hasPunch) Text(String.format("%.1f小时", dayHours), color = if (darkMode) Color(0xFF9CC4FF) else Blue, fontSize = 9.sp, maxLines = 1)
                                                 }
                                             }
                                         }
@@ -602,24 +603,29 @@ fun WorkClockApp(context: Context) {
                 }
             } else if (showProfile) {
                 val backgrounds = listOf(Color(0xFFF2F0FF), Color(0xFFEAF7F4), Color(0xFFFFF1E8), Color(0xFFEAF2FF))
-                Column(Modifier.fillMaxSize().padding(padding).background(backgrounds[profileBackground.coerceIn(0, 3)]).verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(Modifier.fillMaxSize().padding(padding).background(Color(0xFFF4F6FA)).verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = { showProfile = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回打卡") }
                         Spacer(Modifier.weight(1f)); Icon(Icons.Default.AutoAwesome, null, tint = Blue)
                     }
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = themeSurface.copy(alpha = 0.94f))) {
-                        Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Box(Modifier.size(124.dp).background(Color(0xFFE5E9FF), CircleShape).clickable { avatarPicker.launch("image/*") }, contentAlignment = Alignment.Center) {
-                                if (profileAvatar != null) Image(profileAvatar!!.asImageBitmap(), "个人头像", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                else Icon(Icons.Default.AccountCircle, null, tint = Blue, modifier = Modifier.size(100.dp))
-                                Surface(Modifier.align(Alignment.BottomEnd), shape = CircleShape, color = Blue) { Icon(Icons.Default.CameraAlt, null, tint = themeSurface, modifier = Modifier.padding(7.dp).size(18.dp)) }
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(Modifier.fillMaxWidth().height(150.dp).background(brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF345B88), Color(0xFF8DB8C9), Color(0xFFD8E6E8)))), contentAlignment = Alignment.BottomCenter) {
+                                Text("PERSONAL SPACE", modifier = Modifier.align(Alignment.TopStart).padding(16.dp), color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Box(Modifier.offset(y = 52.dp).size(width = 124.dp, height = 124.dp).background(Color(0xFFE5E9FF), RoundedCornerShape(24.dp)).clickable { showAvatarPreview = true }, contentAlignment = Alignment.Center) {
+                                    if (profileAvatar != null) Image(profileAvatar!!.asImageBitmap(), "查看大图头像", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                    else Icon(Icons.Default.AccountCircle, null, tint = Blue, modifier = Modifier.size(100.dp))
+                                }
                             }
+                            Spacer(Modifier.height(42.dp))
+                            Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(profileName.ifBlank { employeeName }, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, color = themeInk)
                             Text("个人空间 · " + if (role == "admin") "管理员" else "员工", color = themeMuted, fontSize = 13.sp)
                             Text("工号：" + employeeId, color = Blue, fontWeight = FontWeight.Medium)
+                            }
                         }
                     }
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = themeSurface)) {
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = themeInk)
                             OutlinedTextField(profileName, { profileName = it }, label = { Text("姓名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -645,11 +651,23 @@ fun WorkClockApp(context: Context) {
                                     finally { profileLoading = false }
                                 }
                             }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text(if (profileLoading) "保存中…" else "保存个人资料") }
-                            OutlinedButton(enabled = !profileLoading, onClick = { avatarPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.AddAPhoto, null); Spacer(Modifier.width(8.dp)); Text("上传/更换头像（保存至 R2）") }
                             if (profileMessage.isNotBlank()) Text(profileMessage, color = Blue, fontSize = 13.sp)
                         }
                     }
-                    Text("轻松工作，自信生活 ✨", color = themeMuted, fontSize = 12.sp)
+                    Text("轻松工作，自信生活 ✨", color = Muted, fontSize = 12.sp)
+                }
+                if (showAvatarPreview) {
+                    AlertDialog(
+                        onDismissRequest = { showAvatarPreview = false },
+                        confirmButton = { TextButton(onClick = { showAvatarPreview = false }) { Text("关闭") } },
+                        title = { Text("头像预览") },
+                        text = {
+                            Box(Modifier.fillMaxWidth().heightIn(min = 220.dp, max = 420.dp), contentAlignment = Alignment.Center) {
+                                if (profileAvatar != null) Image(profileAvatar!!.asImageBitmap(), "放大头像", Modifier.fillMaxWidth().heightIn(max = 380.dp), contentScale = ContentScale.Fit)
+                                else Icon(Icons.Default.AccountCircle, null, tint = Blue, modifier = Modifier.size(180.dp))
+                            }
+                        }
+                    )
                 }
             } else if (showMakeUpRecords && role == "admin") {
                 val recordGroups = makeUpQueryPunches
