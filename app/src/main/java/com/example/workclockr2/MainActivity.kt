@@ -644,8 +644,11 @@ fun WorkClockApp(context: Context) {
                     }
                     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
                         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Box(Modifier.fillMaxWidth().height(150.dp).background(brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF345B88), Color(0xFF8DB8C9), Color(0xFFD8E6E8)))), contentAlignment = Alignment.BottomCenter) {
-                                Text("PERSONAL SPACE", modifier = Modifier.align(Alignment.TopStart).padding(16.dp), color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Box(Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.BottomCenter) {
+                                if (profileBackgroundBitmap != null) {
+                                    Image(profileBackgroundBitmap!!.asImageBitmap(), "头像后方的个人背景图片", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                }
+                                Text("PERSONAL SPACE", modifier = Modifier.align(Alignment.TopStart).padding(16.dp), color = if (profileBackgroundBitmap != null) Color.White else Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 Box(Modifier.offset(y = 52.dp).size(width = 124.dp, height = 124.dp).background(Color(0xFFE5E9FF), RoundedCornerShape(24.dp)).clickable { showAvatarPreview = true }, contentAlignment = Alignment.Center) {
                                     if (profileAvatar != null) Image(profileAvatar!!.asImageBitmap(), "查看大图头像", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                                     else Icon(Icons.Default.AccountCircle, null, tint = Blue, modifier = Modifier.size(100.dp))
