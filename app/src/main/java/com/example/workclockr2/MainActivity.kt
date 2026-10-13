@@ -1182,7 +1182,7 @@ fun WorkClockApp(context: Context) {
                             ) { DatePicker(state = datePickerState) }
                         }
                         makeUpSegments.forEachIndexed { index, segment ->
-                            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFF0EAF5))) {
+                            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text("时间段 ${index + 1}", fontWeight = FontWeight.Bold, color = Ink)
