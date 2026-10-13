@@ -132,6 +132,7 @@ fun WorkClockApp(context: Context) {
     var profileName by remember { mutableStateOf(prefs.getString("name", "员工") ?: "员工") }
     var profileBackground by remember { mutableIntStateOf(prefs.getInt("profile_background", 0)) }
     var profileAvatar by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var showAvatarPreview by remember { mutableStateOf(false) }
     var profileBackgroundImage by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     var profileLoading by remember { mutableStateOf(false) }
     var profileMessage by remember { mutableStateOf("") }
@@ -658,10 +659,35 @@ fun WorkClockApp(context: Context) {
                     }
                     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
                         Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Box(Modifier.size(124.dp).background(Color(0xFFE5E9FF), CircleShape).clickable { avatarPicker.launch("image/*") }, contentAlignment = Alignment.Center) {
-                                if (profileAvatar != null) Image(profileAvatar!!.asImageBitmap(), "个人头像", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                else Icon(Icons.Default.AccountCircle, null, tint = Blue, modifier = Modifier.size(100.dp))
-                                Surface(Modifier.align(Alignment.BottomEnd), shape = CircleShape, color = Blue) { Icon(Icons.Default.CameraAlt, null, tint = Color.White, modifier = Modifier.padding(7.dp).size(18.dp)) }
+                            Box(
+                                Modifier.size(width = 124.dp, height = 148.dp)
+                                    .background(Color(0xFFE5E9FF), RoundedCornerShape(18.dp))
+                                    .clickable { if (profileAvatar != null) showAvatarPreview = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (profileAvatar != null) {
+                                    Image(profileAvatar!!.asImageBitmap(), "个人头像，点击放大", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                } else if (profileBackgroundImage != null) {
+                                    Image(profileBackgroundImage!!.asImageBitmap(), "头像背景图片", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                    Icon(Icons.Default.AccountCircle, null, tint = Color.White, modifier = Modifier.size(82.dp))
+                                } else {
+                                    Icon(Icons.Default.AccountCircle, null, tint = Blue, modifier = Modifier.size(100.dp))
+                                }
+                            }
+                            if (showAvatarPreview && profileAvatar != null) {
+                                androidx.compose.ui.window.Dialog(onDismissRequest = { showAvatarPreview = false }) {
+                                    Box(
+                                        Modifier.fillMaxWidth().background(Color.Transparent).clickable { showAvatarPreview = false },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Image(
+                                            profileAvatar!!.asImageBitmap(),
+                                            "放大后的个人头像，点击关闭",
+                                            Modifier.fillMaxWidth().heightIn(max = 560.dp),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    }
+                                }
                             }
                             Text(profileName.ifBlank { employeeName }, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, color = Ink)
                             Text("个人空间 · " + if (role == "admin") "管理员" else "员工", color = Muted, fontSize = 13.sp)
