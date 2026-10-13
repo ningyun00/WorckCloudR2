@@ -73,6 +73,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun WorkClockApp(context: Context) {
     val prefs = remember { context.getSharedPreferences("workclock", Context.MODE_PRIVATE) }
+    var isDarkMode by remember { mutableStateOf(prefs.getBoolean("dark_mode", false)) }
+    val pageBackground = if (isDarkMode) Color(0xFF101B22) else Color(0xFFF4F7FC)
+    val cardBackground = if (isDarkMode) Color(0xFF1C2935) else Color.White
+    val selectedDayBackground = if (isDarkMode) Color(0xFF263C54) else Color(0xFFEAF2FF)
+    val Ink = if (isDarkMode) Color(0xFFE7EDF5) else Color(0xFF142238)
+    val Muted = if (isDarkMode) Color(0xFFA8B4C5) else Color(0xFF758198)
     var account by remember { mutableStateOf(prefs.getString("account", "") ?: "") }
     val bucket = "workcloudr2"
     var access by remember { mutableStateOf(prefs.getString("access", "") ?: "") }
@@ -386,19 +392,23 @@ fun WorkClockApp(context: Context) {
         }
     }
 
-    MaterialTheme(colorScheme = lightColorScheme(primary = Blue, background = Color(0xFFF4F7FC), surface = Color.White)) {
-        Scaffold(containerColor = Color(0xFFF4F7FC), topBar = {
+    val appColorScheme = if (isDarkMode) darkColorScheme(primary = Blue, background = pageBackground, surface = cardBackground, onBackground = Ink, onSurface = Ink) else lightColorScheme(primary = Blue, background = pageBackground, surface = cardBackground, onBackground = Ink, onSurface = Ink)
+    MaterialTheme(colorScheme = appColorScheme) {
+        Scaffold(containerColor = pageBackground, topBar = {
             TopAppBar(title = {
                 Column {
                     Text("上班打卡", fontWeight = FontWeight.Bold, color = Ink)
                     Text(if (loggedIn) "$employeeName · $employeeId" else "考勤工作台", fontSize = 12.sp, color = Muted)
                 }
             }, actions = {
+                IconButton(onClick = { isDarkMode = !isDarkMode; prefs.edit().putBoolean("dark_mode", isDarkMode).apply() }) {
+                    Icon(if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode, if (isDarkMode) "切换白天模式" else "切换黑夜模式", tint = Ink)
+                }
                 IconButton(onClick = { if (role == "admin" && loggedIn) { configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = ""; configAuthMessage = "" }; showSettings = true }) { Icon(Icons.Default.Settings, "设置") }
-            }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF4F7FC)))
+            }, colors = TopAppBarDefaults.topAppBarColors(containerColor = pageBackground))
         }, bottomBar = {
             if (loggedIn && !needChangePassword && !showAdminSummary && configured) {
-                Surface(shadowElevation = 8.dp, color = Color.White) {
+                Surface(shadowElevation = 8.dp, color = cardBackground) {
                     OutlinedButton(
                         onClick = {
                             loggedIn = false
@@ -522,7 +532,7 @@ fun WorkClockApp(context: Context) {
                     }
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
                             Column(Modifier.padding(14.dp)) {
                                 Text("本月总工时", color = Muted, fontSize = 12.sp)
                                 Text(String.format("%.2f 小时", empTotalHours), color = Blue, fontWeight = FontWeight.Bold, fontSize = 20.sp)
@@ -545,7 +555,7 @@ fun WorkClockApp(context: Context) {
                         } else {
                             LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 items(selectedDayPunches) { punch ->
-                                    Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(12.dp)) {
+                                    Card(colors = CardDefaults.cardColors(containerColor = cardBackground), shape = RoundedCornerShape(12.dp)) {
                                         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Text(when (punch.type) { "IN" -> "上班打卡"; "OUT" -> "下班打卡"; else -> "临时下班" },
                                                 color = Ink, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -579,7 +589,7 @@ fun WorkClockApp(context: Context) {
                                             val hasPunch = dayItems.isNotEmpty()
                                             Card(
                                                 modifier = Modifier.weight(1f).height(66.dp).clickable { selectedSummaryDay = dayKey },
-                                                colors = CardDefaults.cardColors(containerColor = if (hasPunch) Color(0xFFEAF2FF) else Color.White),
+                                                colors = CardDefaults.cardColors(containerColor = if (hasPunch) selectedDayBackground else cardBackground),
                                                 shape = RoundedCornerShape(8.dp)
                                             ) {
                                                 Column(Modifier.fillMaxSize().padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally,
@@ -604,7 +614,7 @@ fun WorkClockApp(context: Context) {
                         TextButton(onClick = { showProfile = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回打卡") }
                         Spacer(Modifier.weight(1f)); Icon(Icons.Default.AutoAwesome, null, tint = Blue)
                     }
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.94f))) {
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
                         Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Box(Modifier.size(124.dp).background(Color(0xFFE5E9FF), CircleShape).clickable { avatarPicker.launch("image/*") }, contentAlignment = Alignment.Center) {
                                 if (profileAvatar != null) Image(profileAvatar!!.asImageBitmap(), "个人头像", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -616,7 +626,7 @@ fun WorkClockApp(context: Context) {
                             Text("工号：" + employeeId, color = Blue, fontWeight = FontWeight.Medium)
                         }
                     }
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
                             OutlinedTextField(profileName, { profileName = it }, label = { Text("姓名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -718,7 +728,7 @@ fun WorkClockApp(context: Context) {
                     LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(recordGroups, key = { it.first }) { (groupId, start, end) ->
                             val emp = summaryEmployees.firstOrNull { it.employeeId == start.employeeId }
-                            Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(14.dp)) {
+                            Card(colors = CardDefaults.cardColors(containerColor = cardBackground), shape = RoundedCornerShape(14.dp)) {
                                 Column(Modifier.fillMaxWidth().padding(12.dp)) {
                                     Text("${emp?.displayName ?: start.employeeId}（${start.employeeId}）", color = Ink, fontWeight = FontWeight.Bold)
                                     Text("${start.day} · ${runCatching { ZonedDateTime.parse(start.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault(start.at.takeLast(8).take(5))} - ${runCatching { ZonedDateTime.parse(end.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault(end.at.takeLast(8).take(5))}", color = Blue, fontWeight = FontWeight.Medium)
@@ -887,7 +897,7 @@ fun WorkClockApp(context: Context) {
                     val totalHours = summaryEmployees.sumOf { emp ->
                         calculateHours(summaryPunches.filter { it.employeeId == emp.employeeId && it.day.startsWith(monthKey) })
                     }
-                    Card(Modifier.fillMaxWidth().padding(top = 10.dp), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Card(Modifier.fillMaxWidth().padding(top = 10.dp), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
                         Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column {
                                 Text("全员累计工时", color = Muted, fontSize = 13.sp)
@@ -910,7 +920,7 @@ fun WorkClockApp(context: Context) {
                                 Card(
                                     modifier = Modifier.fillMaxWidth().clickable { selectedSummaryEmployee = emp },
                                     shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                                    colors = CardDefaults.cardColors(containerColor = cardBackground)
                                 ) {
                                     Column(Modifier.fillMaxWidth().padding(16.dp)) {
                                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -1035,7 +1045,7 @@ fun WorkClockApp(context: Context) {
                         }
                     }
                     item {
-                        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
                             Column(Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                     Text(
