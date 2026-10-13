@@ -481,6 +481,19 @@ fun WorkClockApp(context: Context) {
                                     loggedIn = true; needChangePassword = emp.mustChangePassword
                                     prefs.edit().putString("employee", employeeId).putString("name", employeeName).putString("role", role).putBoolean("loggedIn", true).commit()
                                     try {
+                                        // Load profile once at login and retain it until logout.
+                                        profileLoading = true
+                                        profileAvatar = null
+                                        profileBackgroundBitmap = null
+                                        val profileData = store.readProfileAsync(employeeId)
+                                        profileName = profileData?.name?.ifBlank { employeeName } ?: employeeName
+                                        profileGender = profileData?.gender ?: "未设置"
+                                        profileAge = profileData?.age ?: ""
+                                        profileBackground = profileData?.background ?: 0
+                                        val avatarBytes = store.readBinaryAsync("profiles/avatars/" + employeeId + ".jpg")
+                                        profileAvatar = avatarBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                                        val backgroundBytes = store.readBinaryAsync("profiles/backgrounds/" + employeeId + ".jpg")
+                                        profileBackgroundBitmap = backgroundBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
                                         punchList = store.readPunchesAsync(monthKey).filter { it.employeeId == employeeId }
                                         val todayKey = LocalDate.now().toString()
                                         val todays = punchList.filter { it.day == todayKey }.sortedBy { it.at }
@@ -492,8 +505,10 @@ fun WorkClockApp(context: Context) {
                                         } else {
                                             "尚未打卡"
                                         }
+                                        profileLoading = false
                                         message = if (needChangePassword) "当前为初始密码，请联系管理员更新 employees.json 中的密码配置。" else "登录成功，已同步今日打卡状态。"
                                     } catch (refreshError: Exception) {
+                                        profileLoading = false
                                         Log.e("WorkClockLogin", "登录后读取考勤失败", refreshError)
                                         punchList = emptyList()
                                         status = "状态读取失败"
@@ -631,25 +646,23 @@ fun WorkClockApp(context: Context) {
                 }
             } else if (showProfile) {
                 val backgrounds = listOf(Color(0xFFF2F0FF), Color(0xFFEAF7F4), Color(0xFFFFF1E8), Color(0xFFEAF2FF))
-                Box(Modifier.fillMaxSize().padding(padding)) {
+                Box(Modifier.fillMaxSize().padding(padding).background(themeBackground)) {
                     if (profileBackgroundBitmap != null) {
                         Image(profileBackgroundBitmap!!.asImageBitmap(), "个人自定义背景", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                    } else {
-                        Box(Modifier.fillMaxSize().background(Color.White))
                     }
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = { showProfile = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回打卡") }
                         Spacer(Modifier.weight(1f)); Icon(Icons.Default.AutoAwesome, null, tint = Blue)
                     }
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = themeSurface)) {
                         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Box(Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.BottomCenter) {
                                 if (profileBackgroundBitmap != null) {
                                     Image(profileBackgroundBitmap!!.asImageBitmap(), "头像后方的个人背景图片", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                                 }
                                 Text("PERSONAL SPACE", modifier = Modifier.align(Alignment.TopStart).padding(16.dp), color = if (profileBackgroundBitmap != null) Color.White else Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Box(Modifier.offset(y = 52.dp).size(width = 124.dp, height = 124.dp).background(Color(0xFFE5E9FF), RoundedCornerShape(24.dp)).clickable { showAvatarPreview = true }, contentAlignment = Alignment.Center) {
+                                Box(Modifier.offset(y = 52.dp).size(width = 124.dp, height = 124.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFFE5E9FF)).clickable { showAvatarPreview = true }, contentAlignment = Alignment.Center) {
                                     if (profileAvatar != null) Image(profileAvatar!!.asImageBitmap(), "查看大图头像", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                                     else Icon(Icons.Default.AccountCircle, null, tint = Blue, modifier = Modifier.size(100.dp))
                                 }
@@ -662,7 +675,7 @@ fun WorkClockApp(context: Context) {
                             }
                         }
                     }
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = themeSurface)) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = themeInk)
                             OutlinedTextField(profileName, { profileName = it }, label = { Text("姓名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -998,27 +1011,8 @@ fun WorkClockApp(context: Context) {
                         onHorizontalDrag = { _, amount -> drag += amount },
                         onDragEnd = {
                             if (drag > 70f && loggedIn) {
+                                // Keep profile data in memory until logout; do not reload on each entry.
                                 showProfile = true
-                                profileName = employeeName
-                                scope.launch {
-                                    profileLoading = true
-                                    try {
-                                        val store = R2Store(R2Config(account, bucket, access, secret, ssid))
-                                        // Clear user-specific images first so no previous account image remains visible.
-                                        profileAvatar = null
-                                        profileBackgroundBitmap = null
-                                        val data = store.readProfileAsync(employeeId)
-                                        profileName = data?.name?.ifBlank { employeeName } ?: employeeName
-                                        profileGender = data?.gender ?: "未设置"
-                                        profileAge = data?.age ?: ""
-                                        profileBackground = data?.background ?: 0
-                                        val avatarBytes = store.readBinaryAsync("profiles/avatars/" + employeeId + ".jpg")
-                                        profileAvatar = avatarBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-                                        val backgroundBytes = store.readBinaryAsync("profiles/backgrounds/" + employeeId + ".jpg")
-                                        profileBackgroundBitmap = backgroundBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-                                    } catch (e: Exception) { profileMessage = "读取个人资料失败：" + (e.message ?: e.javaClass.simpleName) }
-                                    finally { profileLoading = false }
-                                }
                             } else if (role == "admin" && drag < -70f) {
                                 showAdminSummary = true
                                 scope.launch {
