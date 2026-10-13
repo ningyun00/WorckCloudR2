@@ -341,7 +341,7 @@ fun WorkClockApp(context: Context) {
         try {
             qrScanMessage = "正在打开本地二维码扫描器…"
             val options = com.journeyapps.barcodescanner.ScanOptions()
-                .setDesiredBarcodeFormats(com.journeyapps.barcode scanner.ScanOptions.QR_CODE)
+                .setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE)
                 .setPrompt("扫描管理员提供的 R2 配置二维码")
                 .setBeepEnabled(false)
                 .setOrientationLocked(false)
