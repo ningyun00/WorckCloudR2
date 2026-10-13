@@ -333,7 +333,17 @@ fun WorkClockApp(context: Context) {
                     qrScanMessage = "扫码成功，已切换为手动配置。请确认信息后点击保存配置。"
                 } catch (e: Exception) { qrScanMessage = "二维码格式不正确：" + (e.message ?: "请使用 R2 配置二维码") }
             }
-            .addOnFailureListener { error -> qrScanMessage = "扫码取消或失败：" + error.toString() }
+            .addOnFailureListener { error ->
+                val status = (error as? com.google.android.gms.common.api.ApiException)?.statusCode
+                qrScanMessage = when {
+                    error is com.google.android.gms.common.api.ApiException && status == 13 ->
+                        "扫码器启动失败（错误码 13）。请检查 Google Play 服务是否正常、网络是否可用，并更新 Google Play 服务后重试；也可以切换到“手动配置”。"
+                    error is com.google.android.gms.common.api.ApiException ->
+                        "扫码器失败（错误码 ${status}）：${error.localizedMessage ?: error.javaClass.simpleName}。请更新 Google Play 服务或使用“手动配置”。"
+                    else ->
+                        "扫码器失败：${error.localizedMessage ?: error.javaClass.simpleName}。请检查 Google Play 服务和网络，或使用“手动配置”。"
+                }
+            }
     }
     fun doPunch(type: String) {
         if (!configured) { showSettings = true; message = "请先完成 R2 配置"; return }
