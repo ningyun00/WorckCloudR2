@@ -647,7 +647,14 @@ fun WorkClockApp(context: Context) {
                 }
             } else if (showProfile) {
                 val backgrounds = listOf(Color(0xFFF2F0FF), Color(0xFFEAF7F4), Color(0xFFFFF1E8), Color(0xFFEAF2FF))
-                Box(Modifier.fillMaxSize().padding(padding).background(themeBackground)) {
+                Box(Modifier.fillMaxSize().padding(padding).background(themeBackground).pointerInput(Unit) {
+                    var drag = 0f
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { _, amount -> drag += amount },
+                        onDragEnd = { if (drag < -70f) showProfile = false; drag = 0f },
+                        onDragCancel = { drag = 0f }
+                    )
+                }) {
                     if (profileBackgroundBitmap != null) {
                         Image(profileBackgroundBitmap!!.asImageBitmap(), "个人自定义背景", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     }
@@ -1258,7 +1265,7 @@ fun WorkClockApp(context: Context) {
                             ) { DatePicker(state = datePickerState) }
                         }
                         makeUpSegments.forEachIndexed { index, segment ->
-                            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFF0EAF5))) {
+                            Card(colors = CardDefaults.cardColors(containerColor = themeSurface)) {
                                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text("时间段 ${index + 1}", fontWeight = FontWeight.Bold, color = themeInk)
@@ -1287,7 +1294,22 @@ fun WorkClockApp(context: Context) {
                                         AlertDialog(
                                             onDismissRequest = { showStartTimePicker = false; showEndTimePicker = false },
                                             title = { Text(if (editingStart) "选择开始时间" else "选择结束时间") },
-                                            text = { TimePicker(state = timePickerState) },
+                                            text = {
+                                                Surface(color = themeSurface, contentColor = themeInk, shape = RoundedCornerShape(20.dp)) {
+                                                    TimePicker(
+                                                        state = timePickerState,
+                                                        colors = TimePickerDefaults.colors(
+                                                            containerColor = themeSurface,
+                                                            clockDialColor = themeBackground,
+                                                            selectorColor = MaterialTheme.colorScheme.primary,
+                                                            timeSelectorSelectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                            timeSelectorUnselectedContainerColor = themeBackground,
+                                                            timeSelectorSelectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                            timeSelectorUnselectedContentColor = themeInk
+                                                        )
+                                                    )
+                                                }
+                                            },
                                             confirmButton = {
                                                 TextButton(onClick = {
                                                     val value = "%02d:%02d".format(timePickerState.hour, timePickerState.minute)
