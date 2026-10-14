@@ -171,8 +171,8 @@ fun WorkClockApp(context: Context) {
             finally { profileLoading = false }
         }
     }
-    LaunchedEffect(showProfile, employeeId, account, access, secret, ssid) {
-        if (showProfile && employeeId.isNotBlank() && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) {
+    LaunchedEffect(employeeId, account, access, secret, ssid) {
+        if (employeeId.isNotBlank() && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) {
             try {
                 val store = R2Store(R2Config(account, bucket, access, secret, ssid))
                 val bytes = store.readBinaryAsync("profiles/backgrounds/" + employeeId + ".jpg")
@@ -452,6 +452,13 @@ fun WorkClockApp(context: Context) {
                     OutlinedButton(
                         onClick = {
                             loggedIn = false
+                            showProfile = false
+                            profileAvatar = null
+                            profileBackgroundImage = null
+                            profileGender = "未设置"
+                            profileAge = ""
+                            profileName = "员工"
+                            profileMessage = ""
                             configUnlocked = false
                             showAdminConfigAuth = false
                             adminConfigPassword = ""
@@ -542,7 +549,7 @@ fun WorkClockApp(context: Context) {
                             finally { busy = false }
                         }
                     }, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "保存中…" else "保存新密码") }
-                    TextButton(onClick = { loggedIn = false; configUnlocked = false; prefs.edit().putBoolean("loggedIn", false).commit() }) { Text("退出登录") }
+                    TextButton(onClick = { loggedIn = false; showProfile = false; profileAvatar = null; profileBackgroundImage = null; profileGender = "未设置"; profileAge = ""; profileName = "员工"; profileMessage = ""; configUnlocked = false; prefs.edit().putBoolean("loggedIn", false).commit() }) { Text("退出登录") }
                 }
             } else if (selectedSummaryEmployee != null && role == "admin") {
                 val emp = selectedSummaryEmployee!!
