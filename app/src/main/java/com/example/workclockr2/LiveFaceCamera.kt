@@ -48,9 +48,9 @@ fun LiveFaceCamera(
     }
 
     DisposableEffect(enabled, lifecycleOwner) {
+        val providerFuture = ProcessCameraProvider.getInstance(context)
         if (enabled) {
             delivered.set(false)
-            val providerFuture = ProcessCameraProvider.getInstance(context)
             val mainExecutor = ContextCompat.getMainExecutor(context)
             val listener = Runnable {
                 try {
