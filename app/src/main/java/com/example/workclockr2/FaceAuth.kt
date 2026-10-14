@@ -82,7 +82,7 @@ class FaceAuth(private val context: Context) {
                         is FloatArray -> raw.copyOf()
                         else -> error("人脸模型输出格式不受支持")
                     }
-                    require(vector.size == 512) { "人脸模型输出维度异常：${vector.size}" }
+                    require(vector.size == 256) { "人脸模型输出维度异常：${vector.size}（当前模型应输出 256 维）" }
                     val norm = sqrt(vector.sumOf { (it * it).toDouble() }).toFloat().coerceAtLeast(1e-12f)
                     return FloatArray(vector.size) { vector[it] / norm }
                 }
