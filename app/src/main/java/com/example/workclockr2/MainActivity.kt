@@ -665,12 +665,8 @@ fun WorkClockApp(context: Context) {
                                 Image(
                                     profileBackgroundImage!!.asImageBitmap(),
                                     "已上传的背景图片",
-                                    Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(28.dp)),
+                                    Modifier.fillMaxWidth().height(250.dp).clip(RoundedCornerShape(28.dp)),
                                     contentScale = ContentScale.Crop
-                                )
-                                Box(
-                                    Modifier.fillMaxWidth().height(300.dp)
-                                        .background(Color(0x66000000), RoundedCornerShape(28.dp))
                                 )
                             }
                             Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
