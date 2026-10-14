@@ -829,6 +829,7 @@ fun WorkClockApp(context: Context) {
                                 showQueryEndPicker = false
                             }) { Text("确定") }
                         }, dismissButton = { TextButton(onClick = { showQueryEndPicker = false }) { Text("取消") } }) { DatePicker(state = state) }
+                    }
                     Button(enabled = !summaryLoading && runCatching { LocalDate.parse(makeUpQueryStart).isBefore(LocalDate.parse(makeUpQueryEnd).plusDays(1)) }.getOrDefault(false), onClick = {
                         scope.launch {
                             summaryLoading = true
