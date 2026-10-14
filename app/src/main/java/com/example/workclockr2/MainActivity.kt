@@ -191,15 +191,17 @@ fun WorkClockApp(context: Context) {
                     profileName = profile.name
                     profileGender = profile.gender
                     profileAge = profile.age
-                    profilePhone = profile.phone
-                    profileWechat = profile.wechat
-                    profileQq = profile.qq
-                    profileEmail = profile.email
-                    profileAddress = profile.address
-                    profileEmergencyContact = profile.emergencyContact
-                    profileEmergencyPhone = profile.emergencyPhone
-                    profileOccupation = profile.occupation
-                    profileBio = profile.bio
+                    // Gson leaves newly added fields null when reading older profile JSON.
+                    // Normalize them before passing values to Compose text fields.
+                    profilePhone = profile.phone.orEmpty()
+                    profileWechat = profile.wechat.orEmpty()
+                    profileQq = profile.qq.orEmpty()
+                    profileEmail = profile.email.orEmpty()
+                    profileAddress = profile.address.orEmpty()
+                    profileEmergencyContact = profile.emergencyContact.orEmpty()
+                    profileEmergencyPhone = profile.emergencyPhone.orEmpty()
+                    profileOccupation = profile.occupation.orEmpty()
+                    profileBio = profile.bio.orEmpty()
                     profileBackground = profile.background
                     val avatarBytes = store.readBinaryAsync(profile.avatarKey)
                     profileAvatar = avatarBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
