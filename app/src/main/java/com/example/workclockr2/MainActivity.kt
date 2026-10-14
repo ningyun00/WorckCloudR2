@@ -113,6 +113,11 @@ fun WorkClockApp(context: Context) {
     var createName by remember { mutableStateOf("") }
     var createRole by remember { mutableStateOf("employee") }
     var busy by remember { mutableStateOf(false) }
+    var showFaceDialog by remember { mutableStateOf(false) }
+    var pendingFacePunchType by remember { mutableStateOf("IN") }
+    var faceGatePassed by remember { mutableStateOf(false) }
+    var faceWorking by remember { mutableStateOf(false) }
+    var faceStatus by remember { mutableStateOf("") }
     var showMakeUpDialog by remember { mutableStateOf(false) }
     var makeUpEmployees by remember { mutableStateOf(listOf<Employee>()) }
     var makeUpEmployeeId by remember { mutableStateOf("") }
@@ -399,6 +404,13 @@ fun WorkClockApp(context: Context) {
         }
     }
     fun doPunch(type: String) {
+        if (!faceGatePassed) {
+            pendingFacePunchType = type
+            faceStatus = ""
+            showFaceDialog = true
+            return
+        }
+        faceGatePassed = false
         if (!configured) { showSettings = true; message = "请先完成 R2 配置"; return }
         if (!loggedIn) { message = "请先登录"; return }
         scope.launch {
@@ -452,6 +464,75 @@ fun WorkClockApp(context: Context) {
         }
     }
 
+
+    val faceCaptureLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: android.graphics.Bitmap? ->
+        if (bitmap == null) {
+            faceStatus = "未获取到相机图像，请重试。"
+        } else {
+            scope.launch {
+                faceWorking = true
+                faceStatus = "正在进行本地人脸识别…"
+                try {
+                    val auth = FaceAuth(context)
+                    val vector = withContext(Dispatchers.Default) { auth.extract(bitmap) }
+                    val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                    val key = "faceprints/" + employeeId + ".bin"
+                    val encryptedExisting = store.readBinaryAsync(key)
+                    val existing = encryptedExisting?.let { runCatching { auth.decrypt(it) }.getOrNull() }
+                    if (existing == null) {
+                        val encrypted = auth.encrypt(vector)
+                        store.writeBinaryAsync(key, encrypted, "application/octet-stream")
+                        val verified = store.readBinaryAsync(key)
+                        check(verified != null && auth.decrypt(verified).contentEquals(vector)) {
+                            "人脸特征已上传，但回读验证失败"
+                        }
+                        showFaceDialog = false
+                        faceStatus = ""
+                        message = "人脸录入成功。以后打卡需要先进行人脸验证，请再次点击打卡完成本次考勤。"
+                    } else {
+                        val score = auth.similarity(existing, vector)
+                        if (score < 0.45f) {
+                            faceStatus = "人脸验证未通过（相似度 ${"%.2f".format(score)}），请正对摄像头重新拍摄。"
+                        } else {
+                            showFaceDialog = false
+                            faceStatus = ""
+                            faceGatePassed = true
+                            doPunch(pendingFacePunchType)
+                        }
+                    }
+                } catch (e: Exception) {
+                    faceStatus = "人脸处理失败：" + (e.message ?: e.javaClass.simpleName)
+                } finally {
+                    if (!bitmap.isRecycled) bitmap.recycle()
+                    faceWorking = false
+                }
+            }
+        }
+    }
+    if (showFaceDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!faceWorking) showFaceDialog = false },
+            title = { Text("人脸录入 / 验证") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("首次打卡会录入本人脸部特征；已录入后，每次打卡都需要通过人脸验证。识别在本机完成，照片不会保存。")
+                    if (faceWorking) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    if (faceStatus.isNotBlank()) Text(faceStatus, color = if (faceStatus.contains("失败") || faceStatus.contains("未通过")) Color(0xFFD34B54) else Muted)
+                }
+            },
+            confirmButton = {
+                Button(enabled = !faceWorking && !busy, onClick = {
+                    faceStatus = "正在打开相机…"
+                    faceCaptureLauncher.launch(null)
+                }) { Text(if (faceWorking) "处理中…" else "打开相机") }
+            },
+            dismissButton = {
+                TextButton(enabled = !faceWorking, onClick = { showFaceDialog = false }) { Text("取消") }
+            }
+        )
+    }
     val appColorScheme = if (isDarkMode) darkColorScheme(primary = Blue, background = pageBackground, surface = cardBackground, onBackground = Ink, onSurface = Ink) else lightColorScheme(primary = Blue, background = pageBackground, surface = cardBackground, onBackground = Ink, onSurface = Ink)
     MaterialTheme(colorScheme = appColorScheme) {
         Scaffold(containerColor = pageBackground, topBar = {
