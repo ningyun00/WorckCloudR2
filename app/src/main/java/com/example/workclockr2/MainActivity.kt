@@ -348,25 +348,49 @@ fun WorkClockApp(context: Context) {
     }
 
     fun saveConfig() {
-        val saved = prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2")
-            .putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).commit()
-        if (!saved) {
-            message = "R2 配置写入本机失败，请检查手机存储空间。"
+        if (account.isBlank() || access.isBlank() || secret.isBlank()) {
+            connectionTest = "请填写完整的 Account ID、Access Key ID 和 Secret Access Key。"
+            message = connectionTest
             return
         }
-        showSettings = false
         scope.launch {
-            if (ssid.isBlank()) {
-                message = "R2 连接配置已保存在本机。考勤 Wi-Fi 尚未设置，请管理员填写 Wi-Fi 名称后再次保存。"
-                return@launch
-            }
-            busy = true
+            testingConnection = true
+            connectionTest = "正在验证 R2 配置…"
             try {
-                R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid.trim())).writeAllowedSsidAsync(ssid.trim())
-                message = "配置已保存。考勤 Wi-Fi 已写入 R2 的 app-config.json，所有员工设备将统一使用。请确认 employees.json 已上传。"
+                val validation = R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid.trim())).testConnectionAsync()
+                connectionTest = validation
+                if (!validation.startsWith("连接成功")) {
+                    message = "R2 配置验证未通过，请检查输入内容后重试。\n" + validation
+                    return@launch
+                }
+                val saved = prefs.edit().putString("account", account.trim()).putString("bucket", "workcloudr2")
+                    .putString("access", access.trim()).putString("secret", secret).putString("ssid", ssid.trim()).commit()
+                if (!saved) {
+                    connectionTest = "R2 连接验证成功，但配置写入本机失败。"
+                    message = connectionTest + "请检查手机存储空间后重试。"
+                    return@launch
+                }
+                showSettings = false
+                configUnlocked = false
+                showAdminConfigAuth = false
+                adminConfigPassword = ""
+                if (ssid.isBlank()) {
+                    message = "R2 连接验证成功，配置已保存。考勤 Wi-Fi 尚未设置，请管理员填写 Wi-Fi 名称后再次保存。"
+                    return@launch
+                }
+                busy = true
+                try {
+                    R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid.trim())).writeAllowedSsidAsync(ssid.trim())
+                    message = "R2 连接验证成功，配置已保存。考勤 Wi-Fi 已写入 R2 的 app-config.json，所有员工设备将统一使用。"
+                } catch (e: Exception) {
+                    message = "R2 连接验证成功，本机配置已保存，但共享 Wi-Fi 写入失败：" + (e.message ?: e.javaClass.simpleName)
+                } finally { busy = false }
             } catch (e: Exception) {
-                message = "本机 R2 配置已保存，但共享 Wi-Fi 写入失败：" + (e.message ?: e.javaClass.simpleName)
-            } finally { busy = false }
+                connectionTest = "测试异常：" + (e.message ?: e.javaClass.simpleName)
+                message = "R2 配置验证失败，尚未保存，也不会进入登录。请检查配置后重试。\n" + connectionTest
+            } finally {
+                testingConnection = false
+            }
         }
     }
     val qrScanLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -1794,10 +1818,16 @@ fun WorkClockApp(context: Context) {
                     Row {
                         if (settingsPage == 0 || role != "admin" || !loggedIn) TextButton(enabled = !testingConnection && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank(), onClick = {
                             scope.launch {
-                                testingConnection = true; connectionTest = "正在测试连接…"
-                                try { connectionTest = R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid)).testConnectionAsync() }
-                                catch (e: Exception) { connectionTest = "测试异常：${e.message ?: e.javaClass.simpleName}" }
-                                finally { testingConnection = false; message = connectionTest }
+                                testingConnection = true
+                                connectionTest = "正在测试连接…"
+                                try {
+                                    connectionTest = R2Store(R2Config(account.trim(), "workcloudr2", access.trim(), secret, ssid.trim())).testConnectionAsync()
+                                    message = if (connectionTest.startsWith("连接成功")) connectionTest
+                                    else "R2 配置验证未通过，配置尚未保存。请修改后重新检测。\n" + connectionTest
+                                } catch (e: Exception) {
+                                    connectionTest = "测试异常：" + (e.message ?: e.javaClass.simpleName)
+                                    message = "R2 配置验证失败，配置尚未保存。请检查输入后重试。\n" + connectionTest
+                                } finally { testingConnection = false }
                             }
                         }) { Text(if (testingConnection) "正在测试…" else "测试连接") }
                         if (configured) TextButton(onClick = { showSettings = false; configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = ""; configAuthMessage = "" }) { Text("取消") }
