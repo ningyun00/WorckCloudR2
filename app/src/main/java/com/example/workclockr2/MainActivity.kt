@@ -1188,7 +1188,7 @@ fun WorkClockApp(context: Context) {
                                                     val dayHours = calculateHours(punchList.filter { it.day == d.toString() })
                                                     val has = punchList.any { it.day == d.toString() }
                                                     Column(
-                                                        Modifier.weight(1f).background(if (d == selectedDay) Color(0xFFE5EEFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                                        Modifier.weight(1f).background(if (d == selectedDay) selectedDayBackground else Color.Transparent, RoundedCornerShape(10.dp))
                                                             .clickable { selectedDay = d }.padding(vertical = 5.dp),
                                                         horizontalAlignment = Alignment.CenterHorizontally
                                                     ) {
@@ -1207,7 +1207,7 @@ fun WorkClockApp(context: Context) {
                                             val d = monday.plusDays(offset.toLong())
                                             val dayHours = calculateHours(punchList.filter { it.day == d.toString() })
                                             val has = punchList.any { it.day == d.toString() }
-                                            Column(Modifier.weight(1f).background(if (d == selectedDay) Color(0xFFE5EEFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                            Column(Modifier.weight(1f).background(if (d == selectedDay) selectedDayBackground else Color.Transparent, RoundedCornerShape(10.dp))
                                                 .clickable { selectedDay = d }.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Text(listOf("一","二","三","四","五","六","日")[offset], color = Muted, fontSize = 10.sp)
                                                 Spacer(Modifier.height(4.dp))
