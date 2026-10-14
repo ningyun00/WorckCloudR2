@@ -7,6 +7,8 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -16,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
@@ -48,6 +49,7 @@ fun LiveFaceCamera(
     }
 
     DisposableEffect(enabled, lifecycleOwner) {
+        val sessionActive = AtomicBoolean(true)
         val providerFuture = ProcessCameraProvider.getInstance(context)
         if (enabled) {
             delivered.set(false)
@@ -60,7 +62,7 @@ fun LiveFaceCamera(
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                     analysis.setAnalyzer(executor) { proxy ->
-                        if (delivered.get()) {
+                        if (!sessionActive.get() || delivered.get()) {
                             proxy.close()
                         } else {
                             val mediaImage = proxy.image
@@ -70,7 +72,7 @@ fun LiveFaceCamera(
                                 val input = InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
                                 detector.process(input)
                                     .addOnSuccessListener(executor) { faces ->
-                                        if (!delivered.get()) {
+                                        if (sessionActive.get() && !delivered.get()) {
                                             when {
                                                 faces.isEmpty() -> onStatus("请将脸部对准取景框，正在实时检测…")
                                                 faces.size > 1 -> onStatus("检测到多张人脸，请确保画面中只有本人")
@@ -97,16 +99,18 @@ fun LiveFaceCamera(
                                             }
                                         }
                                     }
-                                    .addOnFailureListener(executor) { onStatus("人脸检测失败，请重新对准摄像头") }
+                                    .addOnFailureListener(executor) {
+                                        if (sessionActive.get()) onStatus("人脸检测失败，请重新对准摄像头")
+                                    }
                                     .addOnCompleteListener(executor) { proxy.close() }
                             }
                         }
                     }
                     provider.unbindAll()
                     provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis)
-                    onStatus("请正对前置摄像头，系统会自动识别，无需拍照")
+                    if (sessionActive.get()) onStatus("请正对前置摄像头，系统会自动识别，无需拍照")
                 } catch (e: Exception) {
-                    onStatus("无法启动前置摄像头：" + (e.message ?: e.javaClass.simpleName))
+                    if (sessionActive.get()) onStatus("无法启动前置摄像头：" + (e.message ?: e.javaClass.simpleName))
                 }
             }
             providerFuture.addListener(listener, mainExecutor)
@@ -114,18 +118,25 @@ fun LiveFaceCamera(
             runCatching { ProcessCameraProvider.getInstance(context).get().unbindAll() }
         }
         onDispose {
-            // Stop camera use cases when this camera session is dismissed.
-            // Keep detector/executor alive across enabled=true/false changes.
+            // Invalidate callbacks first. Do not close ML Kit or its executor here:
+            // pending detector tasks may still be completing when the dialog is dismissed.
+            sessionActive.set(false)
             runCatching {
                 if (providerFuture.isDone) providerFuture.get().unbindAll()
             }
         }
     }
 
-    DisposableEffect(detector, executor) {
+    DisposableEffect(detector, executor, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_DESTROY) {
+                runCatching { detector.close() }
+                executor.shutdown()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
-            runCatching { detector.close() }
-            executor.shutdown()
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
