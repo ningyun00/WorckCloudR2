@@ -57,7 +57,7 @@ data class Punch(val id: String = UUID.randomUUID().toString(), val employeeId: 
 data class MakeUpSegment(val start: String = "09:00", val end: String = "18:00")
 data class Employee(val employeeId: String, val displayName: String, val role: String, val passwordSalt: String, val passwordHash: String, val mustChangePassword: Boolean, val enabled: Boolean)
 
-data class ProfileData(val employeeId: String, val name: String, val gender: String, val age: String, val avatarKey: String, val background: Int)
+data class ProfileData(val employeeId: String, val name: String, val gender: String, val age: String, val avatarKey: String, val background: Int, val phone: String = "", val wechat: String = "", val qq: String = "", val email: String = "", val address: String = "", val emergencyContact: String = "", val emergencyPhone: String = "", val occupation: String = "", val bio: String = "")
 
 class MainActivity : ComponentActivity() {
     private val requestPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
@@ -130,6 +130,15 @@ fun WorkClockApp(context: Context) {
     var showProfile by remember { mutableStateOf(false) }
     var profileGender by remember { mutableStateOf("未设置") }
     var profileAge by remember { mutableStateOf("") }
+    var profilePhone by remember { mutableStateOf("") }
+    var profileWechat by remember { mutableStateOf("") }
+    var profileQq by remember { mutableStateOf("") }
+    var profileEmail by remember { mutableStateOf("") }
+    var profileAddress by remember { mutableStateOf("") }
+    var profileEmergencyContact by remember { mutableStateOf("") }
+    var profileEmergencyPhone by remember { mutableStateOf("") }
+    var profileOccupation by remember { mutableStateOf("") }
+    var profileBio by remember { mutableStateOf("") }
     var profileName by remember { mutableStateOf(prefs.getString("name", "员工") ?: "员工") }
     var profileBackground by remember { mutableIntStateOf(prefs.getInt("profile_background", 0)) }
     var profileAvatar by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -148,7 +157,7 @@ fun WorkClockApp(context: Context) {
                 val store = R2Store(R2Config(account, bucket, access, secret, ssid))
                 val key = "profiles/avatars/" + employeeId + ".jpg"
                 store.writeBinaryAsync(key, bytes, "image/jpeg")
-                store.writeProfileAsync(ProfileData(employeeId, profileName, profileGender, profileAge, key, profileBackground))
+                store.writeProfileAsync(ProfileData(employeeId, profileName, profileGender, profileAge, key, profileBackground, profilePhone, profileWechat, profileQq, profileEmail, profileAddress, profileEmergencyContact, profileEmergencyPhone, profileOccupation, profileBio))
                 profileAvatar = bitmap
                 profileMessage = "头像已上传并保存到 R2。"
             } catch (e: Exception) { profileMessage = "头像上传失败：" + (e.message ?: e.javaClass.simpleName) }
@@ -182,6 +191,15 @@ fun WorkClockApp(context: Context) {
                     profileName = profile.name
                     profileGender = profile.gender
                     profileAge = profile.age
+                    profilePhone = profile.phone
+                    profileWechat = profile.wechat
+                    profileQq = profile.qq
+                    profileEmail = profile.email
+                    profileAddress = profile.address
+                    profileEmergencyContact = profile.emergencyContact
+                    profileEmergencyPhone = profile.emergencyPhone
+                    profileOccupation = profile.occupation
+                    profileBio = profile.bio
                     profileBackground = profile.background
                     val avatarBytes = store.readBinaryAsync(profile.avatarKey)
                     profileAvatar = avatarBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
@@ -737,6 +755,17 @@ fun WorkClockApp(context: Context) {
                                 listOf("男", "女", "未设置").forEach { g -> FilterChip(selected = profileGender == g, onClick = { profileGender = g }, label = { Text(g) }) }
                             }
                             OutlinedTextField(profileAge, { profileAge = it.filter(Char::isDigit).take(3) }, label = { Text("年龄") }, suffix = { Text("岁") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            Text("联系方式", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                            OutlinedTextField(profilePhone, { profilePhone = it.take(30) }, label = { Text("手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(profileWechat, { profileWechat = it.take(60) }, label = { Text("微信号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(profileQq, { profileQq = it.take(30) }, label = { Text("QQ 号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(profileEmail, { profileEmail = it.take(120) }, label = { Text("邮箱") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            Text("其他资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                            OutlinedTextField(profileOccupation, { profileOccupation = it.take(80) }, label = { Text("职业/岗位") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(profileAddress, { profileAddress = it.take(200) }, label = { Text("联系地址（选填）") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                            OutlinedTextField(profileEmergencyContact, { profileEmergencyContact = it.take(80) }, label = { Text("紧急联系人（选填）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(profileEmergencyPhone, { profileEmergencyPhone = it.take(30) }, label = { Text("紧急联系人电话（选填）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(profileBio, { profileBio = it.take(300) }, label = { Text("个人简介（选填）") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
                             OutlinedButton(enabled = !profileLoading, onClick = { backgroundPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
                                 Icon(Icons.Default.Image, null); Spacer(Modifier.width(8.dp)); Text(if (profileLoading) "处理中…" else "上传/更换背景图片")
                             }
@@ -747,7 +776,7 @@ fun WorkClockApp(context: Context) {
                                     profileLoading = true
                                     try {
                                         val store = R2Store(R2Config(account, bucket, access, secret, ssid))
-                                        store.writeProfileAsync(ProfileData(employeeId, profileName.trim(), profileGender, profileAge, "profiles/avatars/" + employeeId + ".jpg", profileBackground))
+                                        store.writeProfileAsync(ProfileData(employeeId, profileName.trim(), profileGender, profileAge, "profiles/avatars/" + employeeId + ".jpg", profileBackground, profilePhone.trim(), profileWechat.trim(), profileQq.trim(), profileEmail.trim(), profileAddress.trim(), profileEmergencyContact.trim(), profileEmergencyPhone.trim(), profileOccupation.trim(), profileBio.trim()))
                                         prefs.edit().putString("name", profileName.trim()).apply()
                                         employeeName = profileName.trim()
                                         profileMessage = "个人资料已保存到 R2。"
