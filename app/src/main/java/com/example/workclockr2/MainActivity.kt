@@ -654,7 +654,24 @@ fun WorkClockApp(context: Context) {
                     } else {
                         Box(Modifier.fillMaxSize().background(Color.Transparent))
                     }
-                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        Modifier.fillMaxSize()
+                            .pointerInput(showProfile) {
+                                var totalDrag = 0f
+                                detectHorizontalDragGestures(
+                                    onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                                    onDragEnd = {
+                                        if (totalDrag < -90f) showProfile = false
+                                        totalDrag = 0f
+                                    },
+                                    onDragCancel = { totalDrag = 0f }
+                                )
+                            }
+                            .verticalScroll(rememberScrollState())
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = { showProfile = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回打卡") }
                         Spacer(Modifier.weight(1f)); Icon(Icons.Default.AutoAwesome, null, tint = Blue)
