@@ -515,7 +515,7 @@ fun WorkClockApp(context: Context) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 24.dp, vertical = 28.dp),
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -542,6 +542,7 @@ fun WorkClockApp(context: Context) {
                     ) {
                         Box(
                             modifier = Modifier
+                                .offset(y = (-42).dp)
                                 .size(292.dp)
                                 .clip(CircleShape)
                                 .background(Color(0xFF172131)),
@@ -609,6 +610,7 @@ fun WorkClockApp(context: Context) {
                     }
 
                     Column(
+                        modifier = Modifier.offset(y = (-24).dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
