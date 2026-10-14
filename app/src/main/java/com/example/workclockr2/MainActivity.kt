@@ -465,6 +465,16 @@ fun WorkClockApp(context: Context) {
     }
 
 
+    val cameraPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            faceStatus = "正在打开相机…"
+            faceCaptureLauncher.launch(null)
+        } else {
+            faceStatus = "未获得相机权限。请在系统设置中允许本应用使用相机后重试。"
+        }
+    }
     val faceCaptureLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap: android.graphics.Bitmap? ->
@@ -524,8 +534,16 @@ fun WorkClockApp(context: Context) {
             },
             confirmButton = {
                 Button(enabled = !faceWorking && !busy, onClick = {
-                    faceStatus = "正在打开相机…"
-                    faceCaptureLauncher.launch(null)
+                    val permission = android.Manifest.permission.CAMERA
+                    val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                        context, permission
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    if (granted) {
+                        faceStatus = "正在打开相机…"
+                        faceCaptureLauncher.launch(null)
+                    } else {
+                        cameraPermissionLauncher.launch(permission)
+                    }
                 }) { Text(if (faceWorking) "处理中…" else "打开相机") }
             },
             dismissButton = {
