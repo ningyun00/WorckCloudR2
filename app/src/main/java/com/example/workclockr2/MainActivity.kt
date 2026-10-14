@@ -479,6 +479,21 @@ fun WorkClockApp(context: Context) {
         }
     }
 
+    LaunchedEffect(showFaceDialog) {
+        if (showFaceDialog && !faceCameraActive) {
+            val permission = Manifest.permission.CAMERA
+            val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, permission
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (granted) {
+                faceCameraActive = true
+                faceStatus = "正在启动实时人脸识别…"
+            } else {
+                cameraPermissionLauncher.launch(permission)
+            }
+        }
+    }
+
     if (showFaceDialog) {
         Dialog(
             onDismissRequest = {
@@ -591,12 +606,6 @@ fun WorkClockApp(context: Context) {
                                 )
                             }
                         }
-                        Box(
-                            modifier = Modifier
-                                .size(300.dp)
-                                .clip(CircleShape)
-                                .then(Modifier.background(Color.Transparent))
-                        )
                     }
 
                     Column(
