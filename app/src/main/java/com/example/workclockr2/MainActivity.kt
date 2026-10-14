@@ -1333,7 +1333,18 @@ fun WorkClockApp(context: Context) {
                                 dismissButton = { TextButton(onClick = { showMakeUpDatePicker = false }) { Text("取消") } }
                             ) { DatePicker(state = datePickerState) }
                         }
-                        Column(Modifier.fillMaxWidth().heightIn(max = 230.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { makeUpSegments = makeUpSegments + MakeUpSegment() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Add, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("添加时间段")
+                        }
+                        Column(
+                            Modifier.fillMaxWidth().heightIn(max = 230.dp).verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                         makeUpSegments.forEachIndexed { index, segment ->
                             Card(colors = CardDefaults.cardColors(containerColor = cardBackground)) {
                                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1381,9 +1392,6 @@ fun WorkClockApp(context: Context) {
                                 }
                             }
                         }
-                        }
-                        OutlinedButton(onClick = { makeUpSegments = makeUpSegments + MakeUpSegment() }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.Add, null); Spacer(Modifier.width(6.dp)); Text("添加时间段")
                         }
                     }
                 },
