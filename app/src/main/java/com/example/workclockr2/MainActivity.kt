@@ -665,11 +665,11 @@ fun WorkClockApp(context: Context) {
                                 Image(
                                     profileBackgroundImage!!.asImageBitmap(),
                                     "已上传的背景图片",
-                                    Modifier.fillMaxWidth().height(340.dp).clip(RoundedCornerShape(28.dp)),
+                                    Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(28.dp)),
                                     contentScale = ContentScale.Crop
                                 )
                                 Box(
-                                    Modifier.fillMaxWidth().height(340.dp)
+                                    Modifier.fillMaxWidth().height(300.dp)
                                         .background(Color(0x66000000), RoundedCornerShape(28.dp))
                                 )
                             }
@@ -717,11 +717,11 @@ fun WorkClockApp(context: Context) {
                                 listOf("男", "女", "未设置").forEach { g -> FilterChip(selected = profileGender == g, onClick = { profileGender = g }, label = { Text(g) }) }
                             }
                             OutlinedTextField(profileAge, { profileAge = it.filter(Char::isDigit).take(3) }, label = { Text("年龄") }, suffix = { Text("岁") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            Text("个人空间背景图片", color = Ink, fontWeight = FontWeight.SemiBold)
-                            Text("上传的图片将作为个人空间背景，并按工号保存到 R2。", color = Muted, fontSize = 12.sp)
                             OutlinedButton(enabled = !profileLoading, onClick = { backgroundPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
                                 Icon(Icons.Default.Image, null); Spacer(Modifier.width(8.dp)); Text(if (profileLoading) "处理中…" else "上传/更换背景图片")
                             }
+
+                            OutlinedButton(enabled = !profileLoading, onClick = { avatarPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.AddAPhoto, null); Spacer(Modifier.width(8.dp)); Text("上传/更换头像（保存至 R2）") }
                             Button(enabled = !profileLoading && profileName.isNotBlank() && (profileAge.isBlank() || (profileAge.toIntOrNull() ?: 999) <= 120), onClick = {
                                 scope.launch {
                                     profileLoading = true
@@ -735,7 +735,6 @@ fun WorkClockApp(context: Context) {
                                     finally { profileLoading = false }
                                 }
                             }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text(if (profileLoading) "保存中…" else "保存个人资料") }
-                            OutlinedButton(enabled = !profileLoading, onClick = { avatarPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.AddAPhoto, null); Spacer(Modifier.width(8.dp)); Text("上传/更换头像（保存至 R2）") }
                             if (profileMessage.isNotBlank()) Text(profileMessage, color = Blue, fontSize = 13.sp)
                         }
                     }
