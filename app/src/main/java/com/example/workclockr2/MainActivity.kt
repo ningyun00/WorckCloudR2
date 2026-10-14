@@ -207,10 +207,11 @@ fun WorkClockApp(context: Context) {
     var summaryError by remember { mutableStateOf("") }
     var selectedSummaryEmployee by remember { mutableStateOf<Employee?>(null) }
     var selectedSummaryDay by remember { mutableStateOf<String?>(null) }
-    val canNavigateBack = showAdminConfigAuth || showSettings || needChangePassword ||
+    val canNavigateBack = showProfile || showAdminConfigAuth || showSettings || needChangePassword ||
         (role == "admin" && (selectedSummaryDay != null || selectedSummaryEmployee != null || showAdminSummary || showMakeUpRecords || editingMakeUpGroup != null))
     BackHandler(enabled = canNavigateBack) {
         when {
+            showProfile -> showProfile = false
             showAdminConfigAuth -> {
                 showAdminConfigAuth = false
                 adminConfigPassword = ""
@@ -577,7 +578,7 @@ fun WorkClockApp(context: Context) {
                                 Text(String.format("%.2f 小时", empTotalHours), color = Blue, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                             }
                         }
-                        Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
                             Column(Modifier.padding(14.dp)) {
                                 Text("打卡天数 / 次数", color = Muted, fontSize = 12.sp)
                                 Text("${empDays.size} 天 / ${empPunches.size} 次", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -1073,7 +1074,7 @@ fun WorkClockApp(context: Context) {
                             Card(
                                 modifier = Modifier.fillMaxWidth().clickable { hintExpanded = !hintExpanded },
                                 shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White)
+                                colors = CardDefaults.cardColors(containerColor = cardBackground)
                             ) {
                                 Row(Modifier.fillMaxWidth().heightIn(min = 16.dp).padding(horizontal = 8.dp, vertical = if (hintExpanded) 8.dp else 0.dp),
                                     verticalAlignment = Alignment.CenterVertically) {
@@ -1210,7 +1211,7 @@ fun WorkClockApp(context: Context) {
                         }
                     }
                     item {
-                        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
                             Column(Modifier.padding(16.dp)) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                     Text("${selectedDay.monthValue}月${selectedDay.dayOfMonth}日 · 打卡明细", fontWeight = FontWeight.Bold, color = Ink)
@@ -1234,7 +1235,7 @@ fun WorkClockApp(context: Context) {
                                                 }
                                                 Text(when(p.type) { "IN" -> "开始"; "OUT" -> "结束"; else -> "结算区间" }, color = Muted, fontSize = 12.sp)
                                             }
-                                            HorizontalDivider(color = Color(0xFFF0F3F8))
+                                            HorizontalDivider(color = if (isDarkMode) Color(0xFF344454) else Color(0xFFF0F3F8))
                                         }
                                     }
                                 }
