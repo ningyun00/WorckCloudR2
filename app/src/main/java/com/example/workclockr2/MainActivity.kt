@@ -136,6 +136,9 @@ fun WorkClockApp(context: Context) {
     var needChangePassword by remember { mutableStateOf(false) }
     var showAdminSummary by remember { mutableStateOf(false) }
     var showProfile by remember { mutableStateOf(false) }
+    var profilePersonalExpanded by remember { mutableStateOf(false) }
+    var profileContactExpanded by remember { mutableStateOf(false) }
+    var profileOtherExpanded by remember { mutableStateOf(false) }
     var profileGender by remember { mutableStateOf("未设置") }
     var profileAge by remember { mutableStateOf("") }
     var profilePhone by remember { mutableStateOf("") }
@@ -981,26 +984,44 @@ fun WorkClockApp(context: Context) {
                             }
                         }
                     }
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                            Row(Modifier.fillMaxWidth().clickable { profilePersonalExpanded = !profilePersonalExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                Spacer(Modifier.weight(1f))
+                                Icon(if (profilePersonalExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profilePersonalExpanded) "收起个人资料" else "展开个人资料", tint = Muted)
+                            }
+                            if (profilePersonalExpanded) {
                             OutlinedTextField(profileName, { profileName = it }, label = { Text("姓名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text("性别", color = Muted)
                                 listOf("男", "女", "未设置").forEach { g -> FilterChip(selected = profileGender == g, onClick = { profileGender = g }, label = { Text(g) }) }
                             }
                             OutlinedTextField(profileAge, { profileAge = it.filter(Char::isDigit).take(3) }, label = { Text("年龄") }, suffix = { Text("岁") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            Text("联系方式", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                            }
+                            Row(Modifier.fillMaxWidth().clickable { profileContactExpanded = !profileContactExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("联系方式", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                Spacer(Modifier.weight(1f))
+                                Icon(if (profileContactExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profileContactExpanded) "收起联系方式" else "展开联系方式", tint = Muted)
+                            }
+                            if (profileContactExpanded) {
                             OutlinedTextField(profilePhone, { profilePhone = it.take(30) }, label = { Text("手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(profileWechat, { profileWechat = it.take(60) }, label = { Text("微信号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(profileQq, { profileQq = it.take(30) }, label = { Text("QQ 号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(profileEmail, { profileEmail = it.take(120) }, label = { Text("邮箱") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            Text("其他资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                            }
+                            Row(Modifier.fillMaxWidth().clickable { profileOtherExpanded = !profileOtherExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("其他资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                Spacer(Modifier.weight(1f))
+                                Icon(if (profileOtherExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profileOtherExpanded) "收起其他资料" else "展开其他资料", tint = Muted)
+                            }
+                            if (profileOtherExpanded) {
                             OutlinedTextField(profileOccupation, { profileOccupation = it.take(80) }, label = { Text("职业/岗位") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(profileAddress, { profileAddress = it.take(200) }, label = { Text("联系地址（选填）") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
                             OutlinedTextField(profileEmergencyContact, { profileEmergencyContact = it.take(80) }, label = { Text("紧急联系人（选填）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(profileEmergencyPhone, { profileEmergencyPhone = it.take(30) }, label = { Text("紧急联系人电话（选填）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(profileBio, { profileBio = it.take(300) }, label = { Text("个人简介（选填）") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
+                            }
                             OutlinedButton(enabled = !profileLoading, onClick = { backgroundPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
                                 Icon(Icons.Default.Image, null); Spacer(Modifier.width(8.dp)); Text(if (profileLoading) "处理中…" else "上传/更换背景图片")
                             }
