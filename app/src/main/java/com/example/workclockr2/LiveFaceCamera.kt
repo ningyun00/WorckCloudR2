@@ -114,8 +114,17 @@ fun LiveFaceCamera(
             runCatching { ProcessCameraProvider.getInstance(context).get().unbindAll() }
         }
         onDispose {
-            runCatching { ProcessCameraProvider.getInstance(context).get().unbindAll() }
-            detector.close()
+            // Stop camera use cases when this camera session is dismissed.
+            // Keep detector/executor alive across enabled=true/false changes.
+            runCatching {
+                if (providerFuture.isDone) providerFuture.get().unbindAll()
+            }
+        }
+    }
+
+    DisposableEffect(detector, executor) {
+        onDispose {
+            runCatching { detector.close() }
             executor.shutdown()
         }
     }
