@@ -790,16 +790,45 @@ fun WorkClockApp(context: Context) {
                             }
                         }
                     }
+                    var showQueryStartPicker by remember { mutableStateOf(false) }
+                    var showQueryEndPicker by remember { mutableStateOf(false) }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
-                            value = makeUpQueryStart, onValueChange = { makeUpQueryStart = it },
-                            label = { Text("开始日期 YYYY-MM-DD") }, singleLine = true, modifier = Modifier.weight(1f)
+                            value = makeUpQueryStart, onValueChange = {}, readOnly = true,
+                            label = { Text("开始日期") },
+                            trailingIcon = { IconButton(onClick = { showQueryStartPicker = true }) { Icon(Icons.Default.CalendarMonth, "选择开始日期") } },
+                            modifier = Modifier.weight(1f).clickable { showQueryStartPicker = true }
                         )
                         OutlinedTextField(
-                            value = makeUpQueryEnd, onValueChange = { makeUpQueryEnd = it },
-                            label = { Text("结束日期 YYYY-MM-DD") }, singleLine = true, modifier = Modifier.weight(1f)
+                            value = makeUpQueryEnd, onValueChange = {}, readOnly = true,
+                            label = { Text("结束日期") },
+                            trailingIcon = { IconButton(onClick = { showQueryEndPicker = true }) { Icon(Icons.Default.CalendarMonth, "选择结束日期") } },
+                            modifier = Modifier.weight(1f).clickable { showQueryEndPicker = true }
                         )
                     }
+                    if (showQueryStartPicker) {
+                        val state = rememberDatePickerState(initialSelectedDateMillis = runCatching { LocalDate.parse(makeUpQueryStart).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }.getOrNull())
+                        DatePickerDialog(onDismissRequest = { showQueryStartPicker = false }, confirmButton = {
+                            TextButton(onClick = {
+                                state.selectedDateMillis?.let { selected ->
+                                    makeUpQueryStart = Instant.ofEpochMilli(selected).atZone(ZoneOffset.UTC).toLocalDate().toString()
+                                    if (runCatching { LocalDate.parse(makeUpQueryStart).isAfter(LocalDate.parse(makeUpQueryEnd)) }.getOrDefault(false)) makeUpQueryEnd = makeUpQueryStart
+                                }
+                                showQueryStartPicker = false
+                            }) { Text("确定") }
+                        }, dismissButton = { TextButton(onClick = { showQueryStartPicker = false }) { Text("取消") } }) { DatePicker(state = state) }
+                    }
+                    if (showQueryEndPicker) {
+                        val state = rememberDatePickerState(initialSelectedDateMillis = runCatching { LocalDate.parse(makeUpQueryEnd).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }.getOrNull())
+                        DatePickerDialog(onDismissRequest = { showQueryEndPicker = false }, confirmButton = {
+                            TextButton(onClick = {
+                                state.selectedDateMillis?.let { selected ->
+                                    makeUpQueryEnd = Instant.ofEpochMilli(selected).atZone(ZoneOffset.UTC).toLocalDate().toString()
+                                    if (runCatching { LocalDate.parse(makeUpQueryStart).isAfter(LocalDate.parse(makeUpQueryEnd)) }.getOrDefault(false)) makeUpQueryStart = makeUpQueryEnd
+                                }
+                                showQueryEndPicker = false
+                            }) { Text("确定") }
+                        }, dismissButton = { TextButton(onClick = { showQueryEndPicker = false }) { Text("取消") } }) { DatePicker(state = state) }
                     Button(enabled = !summaryLoading && runCatching { LocalDate.parse(makeUpQueryStart).isBefore(LocalDate.parse(makeUpQueryEnd).plusDays(1)) }.getOrDefault(false), onClick = {
                         scope.launch {
                             summaryLoading = true
