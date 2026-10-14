@@ -659,43 +659,52 @@ fun WorkClockApp(context: Context) {
                         Spacer(Modifier.weight(1f)); Icon(Icons.Default.AutoAwesome, null, tint = Blue)
                     }
                     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
-                        Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Box(
-                                Modifier.size(124.dp)
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .background(if (profileBackgroundImage == null) Color.Transparent else Color.Transparent)
-                                    .clickable { if (profileAvatar != null) showAvatarPreview = true },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (profileBackgroundImage != null) {
-                                    Image(profileBackgroundImage!!.asImageBitmap(), "头像背景图片", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                } else {
-                                    Box(Modifier.fillMaxSize().background(Color.Transparent))
-                                }
-                                if (profileAvatar != null) {
-                                    Image(profileAvatar!!.asImageBitmap(), "个人头像，点击放大", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                } else {
-                                    Icon(Icons.Default.AccountCircle, null, tint = if (profileBackgroundImage != null) Color.White else Blue, modifier = Modifier.size(82.dp))
-                                }
+                        Box(Modifier.fillMaxWidth()) {
+                            if (profileBackgroundImage != null) {
+                                Image(
+                                    profileBackgroundImage!!.asImageBitmap(),
+                                    "已上传的背景图片",
+                                    Modifier.fillMaxWidth().height(380.dp).clip(RoundedCornerShape(28.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Box(
+                                    Modifier.fillMaxWidth().height(380.dp)
+                                        .background(Color(0x66000000), RoundedCornerShape(28.dp))
+                                )
                             }
-                            if (showAvatarPreview && profileAvatar != null) {
-                                androidx.compose.ui.window.Dialog(onDismissRequest = { showAvatarPreview = false }) {
-                                    Box(
-                                        Modifier.fillMaxWidth().background(Color.Transparent).clickable { showAvatarPreview = false },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Image(
-                                            profileAvatar!!.asImageBitmap(),
-                                            "放大后的个人头像，点击关闭",
-                                            Modifier.fillMaxWidth().heightIn(max = 560.dp),
-                                            contentScale = ContentScale.Fit
-                                        )
+                            Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Box(
+                                    Modifier.size(124.dp)
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .background(Color.Transparent)
+                                        .clickable { if (profileAvatar != null) showAvatarPreview = true },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (profileAvatar != null) {
+                                        Image(profileAvatar!!.asImageBitmap(), "个人头像，点击放大", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                    } else {
+                                        Icon(Icons.Default.AccountCircle, null, tint = if (profileBackgroundImage != null) Color.White else Blue, modifier = Modifier.size(82.dp))
                                     }
                                 }
+                                if (showAvatarPreview && profileAvatar != null) {
+                                    androidx.compose.ui.window.Dialog(onDismissRequest = { showAvatarPreview = false }) {
+                                        Box(
+                                            Modifier.fillMaxWidth().background(Color.Transparent).clickable { showAvatarPreview = false },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Image(
+                                                profileAvatar!!.asImageBitmap(),
+                                                "放大后的个人头像，点击关闭",
+                                                Modifier.fillMaxWidth().heightIn(max = 560.dp),
+                                                contentScale = ContentScale.Fit
+                                            )
+                                        }
+                                    }
+                                }
+                                Text(profileName.ifBlank { employeeName }, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, color = if (profileBackgroundImage != null) Color.White else Ink)
+                                Text("个人空间 · " + if (role == "admin") "管理员" else "员工", color = if (profileBackgroundImage != null) Color.White else Muted, fontSize = 13.sp)
+                                Text("工号：" + employeeId, color = if (profileBackgroundImage != null) Color.White else Blue, fontWeight = FontWeight.Medium)
                             }
-                            Text(profileName.ifBlank { employeeName }, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, color = Ink)
-                            Text("个人空间 · " + if (role == "admin") "管理员" else "员工", color = Muted, fontSize = 13.sp)
-                            Text("工号：" + employeeId, color = Blue, fontWeight = FontWeight.Medium)
                         }
                     }
                     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
