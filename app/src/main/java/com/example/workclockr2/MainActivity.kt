@@ -1263,7 +1263,7 @@ fun WorkClockApp(context: Context) {
                 onDismissRequest = { if (!makeUpSaving) showMakeUpDialog = false },
                 title = { Text("管理员补班") },
                 text = {
-                    Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(Modifier.heightIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("选择员工、日期和一个或多个补班时间段。每个时间段会生成一条上班和一条下班记录。", color = Muted, fontSize = 12.sp)
                         var employeeMenuExpanded by remember { mutableStateOf(false) }
                         Box {
@@ -1303,8 +1303,9 @@ fun WorkClockApp(context: Context) {
                                 dismissButton = { TextButton(onClick = { showMakeUpDatePicker = false }) { Text("取消") } }
                             ) { DatePicker(state = datePickerState) }
                         }
+                        Column(Modifier.fillMaxWidth().heightIn(max = 230.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         makeUpSegments.forEachIndexed { index, segment ->
-                            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                            Card(colors = CardDefaults.cardColors(containerColor = cardBackground)) {
                                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text("时间段 ${index + 1}", fontWeight = FontWeight.Bold, color = Ink)
@@ -1349,6 +1350,7 @@ fun WorkClockApp(context: Context) {
                                     }
                                 }
                             }
+                        }
                         }
                         OutlinedButton(onClick = { makeUpSegments = makeUpSegments + MakeUpSegment() }, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Default.Add, null); Spacer(Modifier.width(6.dp)); Text("添加时间段")
