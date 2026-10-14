@@ -465,16 +465,6 @@ fun WorkClockApp(context: Context) {
     }
 
 
-    val cameraPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            faceStatus = "正在打开相机…"
-            faceCaptureLauncher.launch(null)
-        } else {
-            faceStatus = "未获得相机权限。请在系统设置中允许本应用使用相机后重试。"
-        }
-    }
     val faceCaptureLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap: android.graphics.Bitmap? ->
@@ -519,6 +509,17 @@ fun WorkClockApp(context: Context) {
                     faceWorking = false
                 }
             }
+        }
+    }
+
+    val cameraPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            faceStatus = "正在打开相机…"
+            faceCaptureLauncher.launch(null)
+        } else {
+            faceStatus = "未获得相机权限。请在系统设置中允许本应用使用相机后重试。"
         }
     }
     if (showFaceDialog) {
