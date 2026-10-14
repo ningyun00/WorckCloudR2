@@ -40,6 +40,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
@@ -478,102 +480,175 @@ fun WorkClockApp(context: Context) {
     }
 
     if (showFaceDialog) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = {
                 if (!faceWorking) {
                     showFaceDialog = false
                     faceCameraActive = false
                 }
             },
-            title = { Text("实时人脸录入 / 验证") },
-            text = {
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF070B12))
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp, vertical = 28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("摄像头将实时检测人脸，检测到本人后自动采集并验证，无需手动拍照。")
-                    if (faceCameraActive) {
-                        Box(Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(16.dp))) {
-                            LiveFaceCamera(
-                                context = context,
-                                enabled = faceCameraActive && showFaceDialog && !faceWorking,
-                                onStatus = { faceStatus = it },
-                                onFaceFrame = { bitmap ->
-                                    scope.launch {
-                                        faceWorking = true
-                                        faceCameraActive = false
-                                        faceStatus = "正在进行本地人脸识别…"
-                                        try {
-                                            val auth = FaceAuth(context)
-                                            val vector = withContext(Dispatchers.Default) { auth.extract(bitmap) }
-                                            val store = R2Store(R2Config(account, bucket, access, secret, ssid))
-                                            val key = "faceprints/" + employeeId + ".bin"
-                                            val encryptedExisting = store.readBinaryAsync(key)
-                                            val existing = encryptedExisting?.let { runCatching { auth.decrypt(it) }.getOrNull() }
-                                            if (existing == null) {
-                                                val encrypted = auth.encrypt(vector)
-                                                store.writeBinaryAsync(key, encrypted, "application/octet-stream")
-                                                val verified = store.readBinaryAsync(key)
-                                                check(verified != null && auth.decrypt(verified).contentEquals(vector)) {
-                                                    "人脸特征已上传，但回读验证失败"
-                                                }
-                                                showFaceDialog = false
-                                                faceStatus = ""
-                                                message = "人脸录入成功。以后打卡将自动进行实时人脸验证，请再次点击打卡完成本次考勤。"
-                                            } else {
-                                                val score = auth.similarity(existing, vector)
-                                                if (score < 0.45f) {
-                                                    faceStatus = "人脸验证未通过（相似度 ${"%.2f".format(score)}），请重新对准摄像头。"
-                                                    faceCameraActive = true
-                                                } else {
-                                                    showFaceDialog = false
-                                                    faceStatus = ""
-                                                    faceGatePassed = true
-                                                    doPunch(pendingFacePunchType)
-                                                }
-                                            }
-                                        } catch (e: Exception) {
-                                            faceStatus = "人脸处理失败：" + (e.message ?: e.javaClass.simpleName)
-                                            faceCameraActive = true
-                                        } finally {
-                                            if (!bitmap.isRecycled) bitmap.recycle()
-                                            faceWorking = false
-                                        }
-                                    }
-                                }
-                            )
-                        }
-                    }
-                    if (faceWorking) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    if (faceStatus.isNotBlank()) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            faceStatus,
-                            color = if (faceStatus.contains("失败") || faceStatus.contains("未通过")) Color(0xFFD34B54) else Muted
+                            "人脸识别打卡",
+                            color = Color.White,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "请将面部对准圆形窗口，识别成功后自动打卡",
+                            color = Color(0xFFB8C3D4),
+                            fontSize = 14.sp
                         )
                     }
-                }
-            },
-            confirmButton = {
-                Button(enabled = !faceWorking && !busy, onClick = {
-                    val permission = android.Manifest.permission.CAMERA
-                    val granted = androidx.core.content.ContextCompat.checkSelfPermission(
-                        context, permission
-                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                    if (granted) {
-                        faceCameraActive = true
-                        faceStatus = "正在启动实时人脸识别…"
-                    } else {
-                        cameraPermissionLauncher.launch(permission)
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(292.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF172131)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (faceCameraActive) {
+                                LiveFaceCamera(
+                                    context = context,
+                                    enabled = faceCameraActive && showFaceDialog && !faceWorking,
+                                    onStatus = { faceStatus = it },
+                                    onFaceFrame = { bitmap ->
+                                        scope.launch {
+                                            faceWorking = true
+                                            faceCameraActive = false
+                                            faceStatus = "正在进行本地人脸识别…"
+                                            try {
+                                                val auth = FaceAuth(context)
+                                                val vector = withContext(Dispatchers.Default) { auth.extract(bitmap) }
+                                                val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                                val key = "faceprints/" + employeeId + ".bin"
+                                                val encryptedExisting = store.readBinaryAsync(key)
+                                                val existing = encryptedExisting?.let { runCatching { auth.decrypt(it) }.getOrNull() }
+                                                if (existing == null) {
+                                                    val encrypted = auth.encrypt(vector)
+                                                    store.writeBinaryAsync(key, encrypted, "application/octet-stream")
+                                                    val verified = store.readBinaryAsync(key)
+                                                    check(verified != null && auth.decrypt(verified).contentEquals(vector)) {
+                                                        "人脸特征已上传，但回读验证失败"
+                                                    }
+                                                    faceStatus = "人脸录入成功，正在自动打卡…"
+                                                    faceGatePassed = true
+                                                    showFaceDialog = false
+                                                    doPunch(pendingFacePunchType)
+                                                } else {
+                                                    val score = auth.similarity(existing, vector)
+                                                    if (score < 0.45f) {
+                                                        faceStatus = "人脸验证未通过（相似度 ${"%.2f".format(score)}），请重新对准圆形窗口。"
+                                                        faceCameraActive = true
+                                                    } else {
+                                                        faceStatus = "识别成功，正在自动打卡…"
+                                                        showFaceDialog = false
+                                                        faceGatePassed = true
+                                                        doPunch(pendingFacePunchType)
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                faceStatus = "人脸处理失败：" + (e.message ?: e.javaClass.simpleName)
+                                                faceCameraActive = true
+                                            } finally {
+                                                if (!bitmap.isRecycled) bitmap.recycle()
+                                                faceWorking = false
+                                            }
+                                        }
+                                    }
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.Face,
+                                    contentDescription = null,
+                                    tint = Color(0xFF8FA5C4),
+                                    modifier = Modifier.size(72.dp)
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(300.dp)
+                                .clip(CircleShape)
+                                .then(Modifier.background(Color.Transparent))
+                        )
                     }
-                }) { Text(if (faceCameraActive) "重新启动识别" else "开启实时识别") }
-            },
-            dismissButton = {
-                TextButton(enabled = !faceWorking, onClick = {
-                    faceCameraActive = false
-                    showFaceDialog = false
-                }) { Text("取消") }
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (faceWorking) {
+                            CircularProgressIndicator(color = Color(0xFF7DB2FF))
+                        }
+                        if (faceStatus.isNotBlank()) {
+                            Text(
+                                faceStatus,
+                                color = if (faceStatus.contains("失败") || faceStatus.contains("未通过")) Color(0xFFFF7B83) else Color(0xFFD7E2F2),
+                                fontSize = 14.sp
+                            )
+                        } else {
+                            Text("请保持正脸、光线充足，画面中只出现本人", color = Color(0xFF9EADC2), fontSize = 12.sp)
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            if (!faceCameraActive && !faceWorking) {
+                                Button(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        val permission = Manifest.permission.CAMERA
+                                        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                                            context, permission
+                                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                        if (granted) {
+                                            faceCameraActive = true
+                                            faceStatus = "正在启动实时人脸识别…"
+                                        } else {
+                                            cameraPermissionLauncher.launch(permission)
+                                        }
+                                    }
+                                ) { Text("开启识别") }
+                            }
+                            OutlinedButton(
+                                modifier = Modifier.weight(1f),
+                                enabled = !faceWorking,
+                                onClick = {
+                                    faceCameraActive = false
+                                    showFaceDialog = false
+                                }
+                            ) { Text("取消", color = Color.White) }
+                        }
+                    }
+                }
             }
-        )
+        }
     }
     val appColorScheme = if (isDarkMode) darkColorScheme(primary = Blue, background = pageBackground, surface = cardBackground, onBackground = Ink, onSurface = Ink) else lightColorScheme(primary = Blue, background = pageBackground, surface = cardBackground, onBackground = Ink, onSurface = Ink)
     MaterialTheme(colorScheme = appColorScheme) {
