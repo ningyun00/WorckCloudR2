@@ -659,13 +659,13 @@ fun WorkClockApp(context: Context) {
                         TextButton(onClick = { showProfile = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回打卡") }
                         Spacer(Modifier.weight(1f)); Icon(Icons.Default.AutoAwesome, null, tint = Blue)
                     }
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = cardBackground)) {
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
                         Box(Modifier.fillMaxWidth()) {
                             if (profileBackgroundImage != null) {
                                 Image(
                                     profileBackgroundImage!!.asImageBitmap(),
                                     "已上传的背景图片",
-                                    Modifier.fillMaxWidth().height(250.dp).clip(RoundedCornerShape(28.dp)),
+                                    Modifier.matchParentSize().clip(RoundedCornerShape(28.dp)),
                                     contentScale = ContentScale.Crop
                                 )
                             }
