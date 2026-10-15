@@ -1972,7 +1972,6 @@ private fun calculateHours(items: List<Punch>): Double {
     if (items.isEmpty()) return 0.0
     val sorted = items.sortedBy { it.at }
     var start: Instant? = null
-    var lastOut: Instant? = null
     var total = 0L
 
     fun instant(p: Punch): Instant? =
@@ -1982,31 +1981,15 @@ private fun calculateHours(items: List<Punch>): Double {
         val at = instant(p) ?: continue
         when (p.type) {
             "IN" -> {
-                // Start a new work interval. A TEMP_OUT explicitly resets the next punch to IN.
-                if (start == null) {
-                    start = at
-                    lastOut = null
-                }
+                if (start == null) start = at
             }
-            "OUT" -> {
-                // Ordinary OUT punches do not reset the state; the latest OUT is the interval end.
-                if (start != null) lastOut = at
-            }
-            "TEMP_OUT" -> {
-                // Count only confirmed work time: close at the latest ordinary OUT, not at TEMP_OUT.
+            "OUT", "TEMP_OUT" -> {
                 if (start != null) {
-                    if (lastOut != null) {
-                        total += Duration.between(start, lastOut!!).toMillis().coerceAtLeast(0)
-                    }
+                    total += Duration.between(start, at).toMillis().coerceAtLeast(0)
                     start = null
-                    lastOut = null
                 }
             }
         }
-    }
-    // An open interval is counted only up to the latest ordinary OUT punch.
-    if (start != null && lastOut != null) {
-        total += Duration.between(start, lastOut!!).toMillis().coerceAtLeast(0)
     }
     return total / 3600000.0
 }
