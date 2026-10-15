@@ -18,7 +18,7 @@ function unb64(value) {
   return Uint8Array.from(raw, c => c.charCodeAt(0));
 }
 function b64url(bytes) {
-  return b64(bytes).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return b64(bytes).replace(/=/g, "").split("+").join("-").split("/").join("_");
 }
 function fromB64url(value) {
   let s = String(value).replace(/-/g, "+").replace(/_/g, "/");
