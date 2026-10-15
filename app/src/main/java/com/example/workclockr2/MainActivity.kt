@@ -2044,6 +2044,8 @@ fun WorkClockApp(context: Context) {
     }
 }
 
+}
+
 private fun calculateHours(items: List<Punch>): Double {
     if (items.isEmpty()) return 0.0
     val sorted = items.sortedBy { it.at }
