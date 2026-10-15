@@ -21,6 +21,38 @@ class R2Store(private val config: R2Config) {
     suspend fun testConnectionAsync(): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { testConnection() }
     suspend fun readEmployeesAsync(): List<Employee> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readEmployees() }
     suspend fun readPunchesAsync(month: String): List<Punch> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readPunches(month) }
+    suspend fun readPunchesForDayAsync(day: String): List<Punch> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val date = java.time.LocalDate.parse(day)
+        val month = date.toString().take(7)
+        val key = "attendance/$month/$day.json"
+        val dailyRaw = readText(key)
+        if (dailyRaw != null) parsePunches(key, dailyRaw).distinctBy { it.id }
+        else {
+            val legacyRaw = readText("attendance/$month.json")
+            if (legacyRaw != null) parsePunches("attendance/$month.json", legacyRaw).filter { it.day == day }.distinctBy { it.id }
+            else emptyList()
+        }
+    }
+    suspend fun updatePunchForDayAndVerifyAsync(day: String, punch: Punch): List<Punch> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val date = java.time.LocalDate.parse(day)
+        val month = date.toString().take(7)
+        val key = "attendance/$month/$day.json"
+        val current = readPunchesForDayInternal(day)
+        val merged = (current.filterNot { it.id == punch.id } + punch).distinctBy { it.id }
+        writeText(key, gson.toJson(merged))
+        val confirmed = readText(key)?.let { parsePunches(key, it) }.orEmpty()
+        check(confirmed.any { it.id == punch.id }) { "写入请求已发送，但回读当天文件后未找到本次记录" }
+        confirmed
+    }
+    private fun readPunchesForDayInternal(day: String): List<Punch> {
+        val date = java.time.LocalDate.parse(day)
+        val month = date.toString().take(7)
+        val key = "attendance/$month/$day.json"
+        val dailyRaw = readText(key)
+        if (dailyRaw != null) return parsePunches(key, dailyRaw).distinctBy { it.id }
+        val legacyRaw = readText("attendance/$month.json") ?: return emptyList()
+        return parsePunches("attendance/$month.json", legacyRaw).filter { it.day == day }.distinctBy { it.id }
+    }
     suspend fun writePunchesAsync(month: String, punches: List<Punch>) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writePunches(month, punches) }
     suspend fun writeEmployeesAsync(employees: List<Employee>) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writeEmployees(employees) }
     suspend fun readAllowedSsidAsync(): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readAllowedSsid() }
