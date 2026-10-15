@@ -125,17 +125,12 @@ class R2Store(private val config: R2Config) {
         val yearMonth = try { java.time.YearMonth.parse(month) } catch (e: Exception) {
             throw IllegalArgumentException("月份格式应为 yyyy-MM：$month", e)
         }
-        // Fetch daily objects concurrently instead of waiting for up to 31 serial network round-trips.
-        val daily = kotlinx.coroutines.runBlocking {
-            kotlinx.coroutines.coroutineScope {
-                (1..yearMonth.lengthOfMonth()).map { day ->
-                    kotlinx.coroutines.async(kotlinx.coroutines.Dispatchers.IO) {
-                        val date = yearMonth.atDay(day).toString()
-                        val key = "attendance/$month/$date.json"
-                        readText(key)?.let { parsePunches(key, it) }
-                    }
-                }.mapNotNull { it.await() }.flatten()
-            }
+        // Read daily files in order; keep the result typed and compatible with this store.
+        val daily = mutableListOf<Punch>()
+        for (day in 1..yearMonth.lengthOfMonth()) {
+            val date = yearMonth.atDay(day).toString()
+            val key = "attendance/$month/$date.json"
+            readText(key)?.let { daily.addAll(parsePunches(key, it)) }
         }
         if (daily.isNotEmpty()) return daily.distinctBy { it.id }
 
