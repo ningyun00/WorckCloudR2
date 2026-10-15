@@ -21,6 +21,8 @@ class R2Store(private val config: R2Config) {
     suspend fun testConnectionAsync(): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { testConnection() }
     suspend fun readEmployeesAsync(): List<Employee> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readEmployees() }
     suspend fun readPunchesAsync(month: String): List<Punch> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readPunches(month) }
+    suspend fun readSchedulesAsync(): List<ShiftSchedule> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readText("schedules.json")?.let { gson.fromJson<List<ShiftSchedule>>(it, object : TypeToken<List<ShiftSchedule>>() {}.type) }.orEmpty() }
+    suspend fun writeSchedulesAsync(schedules: List<ShiftSchedule>) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writeText("schedules.json", gson.toJson(schedules)); check(readSchedulesAsync() == schedules) { "排班写入后回读验证失败" } }
     suspend fun writePunchesAsync(month: String, punches: List<Punch>) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writePunches(month, punches) }
     suspend fun writeEmployeesAsync(employees: List<Employee>) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writeEmployees(employees) }
     suspend fun readAllowedSsidAsync(): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readAllowedSsid() }
