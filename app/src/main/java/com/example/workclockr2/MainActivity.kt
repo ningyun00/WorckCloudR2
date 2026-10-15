@@ -56,7 +56,7 @@ private val Ink = Color(0xFF142238)
 private val Muted = Color(0xFF758198)
 private val AppZone = ZoneOffset.ofHours(8)
 private val DisplayTime = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
-private fun formatAppDateTime(value: String, pattern: DateTimeFormatter): String = runCatching { ZonedDateTime.parse(value).withZoneSameInstant(AppZone).format(pattern) }.getOrDefault(value.replace("T", " ").take(23))
+private fun formatAppDateTime(value: String, pattern: DateTimeFormatter): String = runCatching { ZonedDateTime.parse(value).withZoneSameInstant(AppZone).format(pattern) }.recoverCatching { LocalDateTime.parse(value).format(pattern) }.getOrDefault(value.replace("T", " ").take(23))
 
 data class R2Config(val accountId: String, val bucket: String, val accessKey: String, val secretKey: String, val allowedSsid: String)
 data class Punch(val id: String = UUID.randomUUID().toString(), val employeeId: String, val at: String, val type: String, val day: String)
@@ -1767,8 +1767,8 @@ fun WorkClockApp(context: Context) {
                                     val startAt = date.atTime(LocalTime.parse(segment.start)).atZone(AppZone).toOffsetDateTime()
                                     val endAt = date.atTime(LocalTime.parse(segment.end)).atZone(AppZone).toOffsetDateTime()
                                     listOf(
-                                        Punch(id = "MAKEUP-$groupId-IN", employeeId = makeUpEmployeeId, at = startAt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")), type = "IN", day = date.toString()),
-                                        Punch(id = "MAKEUP-$groupId-OUT", employeeId = makeUpEmployeeId, at = endAt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")), type = "OUT", day = date.toString())
+                                        Punch(id = "MAKEUP-$groupId-IN", employeeId = makeUpEmployeeId, at = startAt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")), type = "IN", day = date.toString()),
+                                        Punch(id = "MAKEUP-$groupId-OUT", employeeId = makeUpEmployeeId, at = endAt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")), type = "OUT", day = date.toString())
                                     )
                                 }
                                 if (workerToken.isBlank()) error("登录状态已失效，请重新登录")
@@ -1972,7 +1972,7 @@ private fun calculateHours(items: List<Punch>): Double {
     var total = 0L
 
     fun instant(p: Punch): Instant? =
-        runCatching { ZonedDateTime.parse(p.at).toInstant() }.getOrNull()
+        runCatching { ZonedDateTime.parse(p.at).toInstant() }.recoverCatching { LocalDateTime.parse(p.at).atZone(AppZone).toInstant() }.getOrNull()
 
     for (p in sorted) {
         val at = instant(p) ?: continue
