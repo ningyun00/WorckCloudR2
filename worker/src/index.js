@@ -155,9 +155,30 @@ export default {
         const record = { id: body.id, employeeId: session.employeeId, at: when.at, type: body.type, day: when.day };
         const lock = env.ATTENDANCE_LOCK.get(env.ATTENDANCE_LOCK.idFromName("attendance-global"));
         const saved = await lock.fetch("https://lock.internal/append", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(record) });
-        const result = await saved.json().catch(() => null);
         if (!saved.ok) return wrap(fail(500, "打卡保存失败，请稍后重试"));
         return wrap(json({ record }));
+      }
+      if (request.method === "POST" && url.pathname === "/api/admin/attendance/makeup") {
+        if (session.role !== "admin") return wrap(fail(403, "仅管理员可以添加补班记录"));
+        const body = await request.json().catch(() => null);
+        if (!body || !Array.isArray(body.records) || body.records.length < 2 || body.records.length > 100) return wrap(fail(400, "补班记录格式无效"));
+        const list = await employees(env.ATTENDANCE_BUCKET);
+        const enabledIds = new Set(list.filter(x => x && x.enabled === true).map(x => String(x.employeeId)));
+        const seen = new Set();
+        for (const record of body.records) {
+          if (!record || typeof record.id !== "string" || !record.id || record.id.length > 128 ||
+              typeof record.employeeId !== "string" || !enabledIds.has(record.employeeId) ||
+              !/^\d{4}-\d{2}-\d{2}$/.test(record.day) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\+08:00|Z)$/.test(record.at) ||
+              !["IN", "OUT"].includes(record.type) || seen.has(record.id)) {
+            return wrap(fail(400, "补班记录内容无效"));
+          }
+          seen.add(record.id);
+        }
+        const lock = env.ATTENDANCE_LOCK.get(env.ATTENDANCE_LOCK.idFromName("attendance-global"));
+        const saved = await lock.fetch("https://lock.internal/append-many", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ records: body.records }) });
+        const result = await saved.json().catch(() => null);
+        if (!saved.ok) return wrap(fail(500, result && result.error === "Duplicate punch ID" ? "补班记录编号重复，请重新提交" : "补班保存失败，请重试"));
+        return wrap(json({ ok: true, count: body.records.length }));
       }
       if (request.method === "POST" && url.pathname === "/api/password") {
         const body = await request.json().catch(() => null);
@@ -203,6 +224,30 @@ export class AttendanceLock {
         const check = await readJsonObject(this.env.ATTENDANCE_BUCKET, key);
         if (!Array.isArray(check) || !check.some(x => x.id === body.id)) return json({ error: "Write verification failed" }, 500);
         return json({ records: check });
+      }
+      if (url.pathname === "/append-many") {
+        if (!Array.isArray(body.records) || body.records.length < 2) return json({ error: "Invalid records" }, 400);
+        const byDay = new Map();
+        for (const record of body.records) {
+          if (!record || typeof record.day !== "string" || typeof record.employeeId !== "string" || typeof record.id !== "string") return json({ error: "Invalid record" }, 400);
+          if (!byDay.has(record.day)) byDay.set(record.day, []);
+          byDay.get(record.day).push(record);
+        }
+        for (const [day, additions] of byDay) {
+          const key = dayKey(day);
+          let current = await readJsonObject(this.env.ATTENDANCE_BUCKET, key);
+          if (!Array.isArray(current)) {
+            const legacy = await readJsonObject(this.env.ATTENDANCE_BUCKET, "attendance/" + day.slice(0, 7) + ".json");
+            current = Array.isArray(legacy) ? legacy.filter(x => x.day === day) : [];
+          }
+          const ids = new Set(current.map(x => x.id));
+          if (additions.some(x => ids.has(x.id))) return json({ error: "Duplicate punch ID" }, 409);
+          current.push(...additions);
+          await this.env.ATTENDANCE_BUCKET.put(key, JSON.stringify(current), { httpMetadata: { contentType: "application/json; charset=utf-8" } });
+          const check = await readJsonObject(this.env.ATTENDANCE_BUCKET, key);
+          if (!Array.isArray(check) || additions.some(x => !check.some(y => y.id === x.id))) return json({ error: "Write verification failed" }, 500);
+        }
+        return json({ ok: true, count: body.records.length });
       }
       if (url.pathname === "/change-password") {
         if (typeof body.employeeId !== "string" || typeof body.passwordSalt !== "string" || typeof body.passwordHash !== "string") return json({ error: "Invalid request" }, 400);
