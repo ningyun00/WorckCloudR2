@@ -99,6 +99,8 @@ fun WorkClockApp(context: Context) {
     var employeeName by remember { mutableStateOf(prefs.getString("name", "") ?: "员工") }
     var role by remember { mutableStateOf(prefs.getString("role", "") ?: "") }
     var loggedIn by remember { mutableStateOf(prefs.getBoolean("loggedIn", false)) }
+    var workerToken by remember { mutableStateOf(prefs.getString("worker_token", "") ?: "") }
+    val attendanceApi = remember { AttendanceApi() }
     var punchList by remember { mutableStateOf(listOf<Punch>()) }
     var selectedDay by remember { mutableStateOf(LocalDate.now(AppZone)) }
     var showMonthCalendar by remember { mutableStateOf(false) }
@@ -424,8 +426,13 @@ fun WorkClockApp(context: Context) {
             busy = true
             message = "正在读取统一考勤配置…"
             try {
-                val baseStore = R2Store(R2Config(account, bucket, access, secret, ""))
-                val allowedSsid = baseStore.readAllowedSsidAsync()
+                if (workerToken.isBlank()) {
+                    loggedIn = false
+                    prefs.edit().putBoolean("loggedIn", false).remove("worker_token").commit()
+                    message = "登录状态已失效，请重新登录。"
+                    return@launch
+                }
+                val allowedSsid = attendanceApi.allowedSsid(workerToken)
                 if (allowedSsid.isBlank()) {
                     message = "管理员尚未在 R2 的 app-config.json 中设置考勤 Wi-Fi，请联系管理员。"
                     return@launch
@@ -447,17 +454,13 @@ fun WorkClockApp(context: Context) {
                         return@launch
                     }
                 }
-                message = "正在保存打卡记录…"
-                val cfg = R2Config(account, bucket, access, secret, allowedSsid)
-                val punchTime = ZonedDateTime.now(AppZone).let { currentTime ->
-                    if (type == "IN") currentTime.minusMinutes(1) else currentTime.plusMinutes(1)
-                }
-                val punch = Punch(employeeId = employeeId, at = punchTime.toString(), type = type, day = punchTime.toLocalDate().toString())
-                val punchStore = R2Store(cfg)
-                val savedToday = punchStore.updatePunchForDayAndVerifyAsync(punch.day, punch)
-                punchList = (punchList.filterNot { it.day == punch.day } + savedToday.filter { it.employeeId == employeeId }).distinctBy { it.id }
+                message = "正在通过考勤服务保存打卡记录…"
+                val saved = attendanceApi.punch(workerToken, UUID.randomUUID().toString(), type)
+                val todays = attendanceApi.punchesForDay(workerToken, saved.day)
+                val monthRows = attendanceApi.punchesForMonth(workerToken, saved.day.take(7))
+                punchList = (monthRows.filterNot { it.day == saved.day } + todays).distinctBy { it.id }
                 status = when(type) { "IN" -> "已上班"; "OUT" -> "已下班"; else -> "临时下班已记录" }
-                message = "$status · 已保存并验证 · ${ZonedDateTime.now().format(fmt)}"
+                message = "$status · 服务端已保存并回读验证 · ${ZonedDateTime.now().format(fmt)}"
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 val detail = buildString {
@@ -466,10 +469,10 @@ fun WorkClockApp(context: Context) {
                     append(t.message ?: "无错误消息")
                     t.cause?.let { append("\\n原因："); append(it.javaClass.name); append(": "); append(it.message ?: "") }
                 }
-                Log.e("WorkClockPunch", "打卡失败，阶段：R2 读取/创建/写入/回读", t)
+                Log.e("WorkClockPunch", "考勤服务打卡请求失败", t)
                 prefs.edit().putString("last_punch_error", detail.take(1800))
                     .putString("last_punch_error_time", ZonedDateTime.now().toString()).apply()
-                message = "打卡失败（已保存诊断）：${detail.take(220)}"
+                message = "打卡失败：${t.message ?: detail.take(180)}"
             } finally { busy = false }
         }
     }
@@ -732,42 +735,34 @@ fun WorkClockApp(context: Context) {
                         scope.launch {
                             busy = true
                             try {
-                                val store = R2Store(R2Config(account,bucket,access,secret,ssid))
-                                val emp = store.readEmployeesAsync()
-                                    .firstOrNull { it.employeeId == loginId && it.enabled }
-                                if (emp == null) message = "工号不存在或已停用"
-                                else if (!R2Store.verifyPassword(emp, loginPassword)) message = "密码错误"
-                                else {
-                                    employeeId = emp.employeeId; employeeName = emp.displayName; role = emp.role
-                                    loggedIn = true; needChangePassword = emp.mustChangePassword
-                                    prefs.edit().putString("employee", employeeId).putString("name", employeeName).putString("role", role).putBoolean("loggedIn", true).commit()
-                                    try {
-                                        val todayKey = LocalDate.now(AppZone).toString()
-                                        val todays = store.readPunchesForDayAsync(todayKey).filter { it.employeeId == employeeId }
-                                        punchList = todays
-                                        scope.launch {
-                                            try {
-                                                val monthRows = store.readPunchesAsync(monthKey).filter { it.employeeId == employeeId }
-                                                punchList = (monthRows.filterNot { it.day == todayKey } + todays).distinctBy { it.id }
-                                            } catch (e: Exception) {
-                                                Log.e("WorkClockLogin", "后台加载月度考勤失败", e)
-                                            }
-                                        }
-                                        val lastTemp = todays.indexOfLast { it.type == "TEMP_OUT" }
-                                        status = if (todays.drop(lastTemp + 1).any { it.type == "IN" }) {
-                                            "已上班"
-                                        } else if (todays.isNotEmpty()) {
-                                            "已打卡"
-                                        } else {
-                                            "尚未打卡"
-                                        }
-                                        message = if (needChangePassword) "当前为初始密码，请联系管理员更新 employees.json 中的密码配置。" else "登录成功，已同步今日打卡状态。"
-                                    } catch (refreshError: Exception) {
-                                        Log.e("WorkClockLogin", "登录后读取考勤失败", refreshError)
-                                        punchList = emptyList()
-                                        status = "状态读取失败"
-                                        message = "登录成功，但读取考勤记录失败：" + (refreshError.message ?: refreshError.javaClass.simpleName)
+                                val session = attendanceApi.login(loginId.trim(), loginPassword)
+                                workerToken = session.token
+                                employeeId = session.employeeId
+                                employeeName = session.displayName
+                                role = session.role
+                                loggedIn = true
+                                needChangePassword = session.mustChangePassword
+                                prefs.edit().putString("worker_token", workerToken).putString("employee", employeeId)
+                                    .putString("name", employeeName).putString("role", role).putBoolean("loggedIn", true).commit()
+                                try {
+                                    val todayKey = LocalDate.now(AppZone).toString()
+                                    val todays = attendanceApi.punchesForDay(workerToken, todayKey)
+                                    val monthRows = attendanceApi.punchesForMonth(workerToken, monthKey)
+                                    punchList = (monthRows.filterNot { it.day == todayKey } + todays).distinctBy { it.id }
+                                    val lastTemp = todays.indexOfLast { it.type == "TEMP_OUT" }
+                                    status = if (todays.drop(lastTemp + 1).any { it.type == "IN" }) {
+                                        "已上班"
+                                    } else if (todays.isNotEmpty()) {
+                                        "已打卡"
+                                    } else {
+                                        "尚未打卡"
                                     }
+                                    message = if (needChangePassword) "首次登录，请设置新密码。" else "登录成功，已通过考勤服务同步记录。"
+                                } catch (refreshError: Exception) {
+                                    Log.e("WorkClockLogin", "登录后同步考勤失败", refreshError)
+                                    punchList = emptyList()
+                                    status = "状态读取失败"
+                                    message = "登录成功，但同步考勤记录失败：" + (refreshError.message ?: refreshError.javaClass.simpleName)
                                 }
                             } catch (e: Exception) { message = "登录失败：${e.message ?: "请检查 R2 文件"}" }
                             finally { busy = false }
@@ -785,10 +780,10 @@ fun WorkClockApp(context: Context) {
                         scope.launch {
                             busy = true
                             try {
-                                val store = R2Store(R2Config(account,bucket,access,secret,ssid))
-                                val list = store.readEmployeesAsync()
-                                store.writeEmployeesAsync(list.map { if (it.employeeId == employeeId) R2Store.createEmployee(it.employeeId,it.displayName,it.role,newPassword,false,it.enabled) else it })
-                                needChangePassword = false; newPassword = ""; confirmPassword = ""; message = "密码已更新"
+                                if (workerToken.isBlank()) error("登录状态已失效，请重新登录")
+                                attendanceApi.changePassword(workerToken, loginPassword, newPassword)
+                                loginPassword = newPassword
+                                needChangePassword = false; newPassword = ""; confirmPassword = ""; message = "密码已通过考勤服务更新"
                             } catch (e: Exception) { message = "修改失败：" + (e.message ?: "请检查 R2 权限") }
                             finally { busy = false }
                         }
