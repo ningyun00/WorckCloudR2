@@ -1414,8 +1414,13 @@ fun WorkClockApp(context: Context) {
                                         profileGender = data?.gender ?: "未设置"
                                         profileAge = data?.age ?: ""
                                         profileBackground = data?.background ?: prefs.getInt("profile_background", 0)
-                                        val bytes = store.readBinaryAsync(data?.avatarKey ?: "profiles/avatars/" + employeeId + ".jpg")
-                                        if (bytes != null) profileAvatar = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+
+                                        // Restore both images from R2 whenever this user's profile is opened.
+                                        val avatarBytes = store.readBinaryAsync(data?.avatarKey ?: "profiles/avatars/" + employeeId + ".jpg")
+                                        profileAvatar = avatarBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+
+                                        val backgroundBytes = store.readBinaryAsync("profiles/backgrounds/" + employeeId + ".jpg")
+                                        profileBackgroundImage = backgroundBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
                                     } catch (e: Exception) { profileMessage = "读取个人资料失败：" + (e.message ?: e.javaClass.simpleName) }
                                     finally { profileLoading = false }
                                 }
