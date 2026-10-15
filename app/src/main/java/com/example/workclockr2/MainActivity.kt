@@ -1689,7 +1689,7 @@ fun WorkClockApp(context: Context) {
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                         makeUpSegments.forEachIndexed { index, segment ->
-                            Card(colors = CardDefaults.cardColors(containerColor = Color.Transparent), border = BorderStroke(1.dp, if (isDarkMode) Color(0xFF4A4A4A) else Color(0xFFD0D0D0), shape = RoundedCornerShape(12.dp)) {
+                            Card(colors = CardDefaults.cardColors(containerColor = Color.Transparent), border = BorderStroke(1.dp, if (isDarkMode) Color(0xFF4A4A4A) else Color(0xFFD0D0D0)), shape = RoundedCornerShape(12.dp)) {
                                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text("时间段 ${index + 1}", fontWeight = FontWeight.Bold, color = Ink)
@@ -1706,7 +1706,7 @@ fun WorkClockApp(context: Context) {
                                             modifier = Modifier.weight(1f).clickable { showStartTimePicker = true }
                                         )
                                         OutlinedTextField(
-                                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Ink, unfocusedTextColor = Ink, focusedLabelColor = Blue, unfocusedLabelColor = Muted, focusedBorderColor = Blue, unfocusedBorderColor = Muted, focusedContainerColor = cardBackground, unfocusedContainerColor = cardBackground),
+                                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Ink, unfocusedTextColor = Ink, focusedLabelColor = Ink, unfocusedLabelColor = Muted, focusedBorderColor = Muted, unfocusedBorderColor = Muted, focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent),
                                             value = segment.end, onValueChange = {}, readOnly = true,
                                             label = { Text("结束时间") },
                                             trailingIcon = { IconButton(onClick = { showEndTimePicker = true }) { Icon(Icons.Default.AccessTime, "选择结束时间") } },
@@ -1721,7 +1721,7 @@ fun WorkClockApp(context: Context) {
                                             onDismissRequest = { showStartTimePicker = false; showEndTimePicker = false },
                                             title = { Text(if (editingStart) "选择开始时间" else "选择结束时间", color = Ink) },
                                             containerColor = cardBackground,
-                                            text = { TimePicker(state = timePickerState, colors = TimePickerDefaults.colors(clockDialColor = selectedDayBackground, selectorColor = Blue, containerColor = cardBackground, periodSelectorBorderColor = Muted, timeSelectorSelectedContainerColor = Blue, timeSelectorUnselectedContainerColor = selectedDayBackground, timeSelectorSelectedContentColor = Color.White, timeSelectorUnselectedContentColor = Ink)) },
+                                            text = { TimePicker(state = timePickerState, colors = TimePickerDefaults.colors(clockDialColor = cardBackground, selectorColor = Blue, containerColor = cardBackground, periodSelectorBorderColor = Muted, timeSelectorSelectedContainerColor = cardBackground, timeSelectorUnselectedContainerColor = cardBackground, timeSelectorSelectedContentColor = Ink, timeSelectorUnselectedContentColor = Ink)) },
                                             confirmButton = {
                                                 TextButton(onClick = {
                                                     val value = "%02d:%02d".format(timePickerState.hour, timePickerState.minute)
