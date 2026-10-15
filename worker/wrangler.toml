@@ -1,0 +1,15 @@
+name = "workclockr2-auth"
+main = "src/index.js"
+compatibility_date = "2026-10-15"
+
+[[r2_buckets]]
+binding = "ATTENDANCE_BUCKET"
+bucket_name = "workcloudr2"
+
+[[durable_objects.bindings]]
+name = "ATTENDANCE_LOCK"
+class_name = "AttendanceLock"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AttendanceLock"]
