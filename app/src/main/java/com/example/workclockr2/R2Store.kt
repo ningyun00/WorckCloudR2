@@ -125,15 +125,19 @@ class R2Store(private val config: R2Config) {
         val yearMonth = try { java.time.YearMonth.parse(month) } catch (e: Exception) {
             throw IllegalArgumentException("月份格式应为 yyyy-MM：$month", e)
         }
-        val daily = mutableListOf<Punch>()
-        var foundDailyFile = false
-        for (day in 1..yearMonth.lengthOfMonth()) {
-            val date = yearMonth.atDay(day).toString()
-            val raw = readText("attendance/$month/$date.json") ?: continue
-            foundDailyFile = true
-            daily += parsePunches("attendance/$month/$date.json", raw)
+        // Fetch daily objects concurrently instead of waiting for up to 31 serial network round-trips.
+        val daily = kotlinx.coroutines.runBlocking {
+            kotlinx.coroutines.coroutineScope {
+                (1..yearMonth.lengthOfMonth()).map { day ->
+                    kotlinx.coroutines.async(kotlinx.coroutines.Dispatchers.IO) {
+                        val date = yearMonth.atDay(day).toString()
+                        val key = "attendance/$month/$date.json"
+                        readText(key)?.let { parsePunches(key, it) }
+                    }
+                }.mapNotNull { it.await() }.flatten()
+            }
         }
-        if (foundDailyFile) return daily.distinctBy { it.id }
+        if (daily.isNotEmpty()) return daily.distinctBy { it.id }
 
         // Migrate older monthly files on first read; keep the legacy file as a backup.
         val legacyKey = "attendance/$month.json"
