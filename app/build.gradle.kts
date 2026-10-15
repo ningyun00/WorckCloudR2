@@ -10,8 +10,8 @@ android {
         applicationId = "com.example.workclockr2"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.1.8"
+        versionCode = 9
+        versionName = "0.1.9"
     }
     buildFeatures { compose = true }
     compileOptions {
