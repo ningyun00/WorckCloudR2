@@ -1623,6 +1623,19 @@ fun WorkClockApp(context: Context) {
                                             if (none { it.id == lastOut.id }) add(lastOut)
                                         }
                                     }.sortedBy { it.at }
+                                        val tempIndex = ordered.indexOfLast { it.type == "TEMP_OUT" }
+                                        ordered.firstOrNull { it.type == "IN" }?.let { add(it) }
+                                        if (tempIndex >= 0) {
+                                            ordered.take(tempIndex).lastOrNull { it.type == "OUT" }?.let { add(it) }
+                                            add(ordered[tempIndex])
+                                            ordered.drop(tempIndex + 1).firstOrNull { it.type == "IN" }?.let { nextIn ->
+                                                if (none { it.id == nextIn.id }) add(nextIn)
+                                            }
+                                        }
+                                        ordered.lastOrNull { it.type == "OUT" }?.let { lastOut ->
+                                            if (none { it.id == lastOut.id }) add(lastOut)
+                                        }
+                                    }.sortedBy { it.at }
                                     LazyColumn(
                                         modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
                                         verticalArrangement = Arrangement.spacedBy(0.dp)
