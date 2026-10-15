@@ -1608,11 +1608,20 @@ fun WorkClockApp(context: Context) {
                                 if (dayPunches.isEmpty()) {
                                     Text("当天暂无打卡记录", color = Muted, modifier = Modifier.padding(vertical = 16.dp))
                                 } else {
+                                    val homePunchDetails = buildList {
+                                        dayPunches.filter { it.type == "IN" }.minByOrNull { it.at }?.let { add(it) }
+                                        dayPunches.filter { it.type == "TEMP_OUT" }.maxByOrNull { it.at }?.let { temp ->
+                                            if (none { it.id == temp.id }) add(temp)
+                                        }
+                                        dayPunches.filter { it.type == "OUT" }.maxByOrNull { it.at }?.let { lastOut ->
+                                            if (none { it.id == lastOut.id }) add(lastOut)
+                                        }
+                                    }.sortedBy { it.at }
                                     LazyColumn(
                                         modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
                                         verticalArrangement = Arrangement.spacedBy(0.dp)
                                     ) {
-                                        items(dayPunches, key = { it.id }) { p ->
+                                        items(homePunchDetails, key = { it.id }) { p ->
                                             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                                 Icon(Icons.Default.Circle, null, tint = when(p.type) { "IN" -> Color(0xFF16A36A); "OUT" -> Color(0xFFDB5864); else -> Color(0xFFED9A32) }, modifier = Modifier.size(10.dp))
                                                 Spacer(Modifier.width(10.dp))
