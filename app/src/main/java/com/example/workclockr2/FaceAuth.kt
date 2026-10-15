@@ -46,7 +46,13 @@ class FaceAuth(private val context: Context) {
         val faces = Tasks.await(detector.process(image))
         require(faces.size == 1) { if (faces.isEmpty()) "没有检测到人脸，请正对摄像头并重新拍摄" else "检测到多张人脸，请确保画面中只有本人" }
         val face = faces.single()
-        require(face.boundingBox.width() >= 80 && face.boundingBox.height() >= 80) { "人脸太小，请靠近摄像头" }
+        require(face.boundingBox.width() >= 100 && face.boundingBox.height() >= 100) { "人脸太小，请靠近摄像头" }
+        require(face.getLandmark(com.google.mlkit.vision.face.FaceLandmark.LEFT_EYE) != null &&
+            face.getLandmark(com.google.mlkit.vision.face.FaceLandmark.RIGHT_EYE) != null &&
+            face.getLandmark(com.google.mlkit.vision.face.FaceLandmark.NOSE_BASE) != null &&
+            face.getLandmark(com.google.mlkit.vision.face.FaceLandmark.MOUTH_BOTTOM) != null) {
+            "未检测到完整面部特征，请露出双眼、鼻子和嘴巴，并正对摄像头"
+        }
         val bounds = face.boundingBox
         val side = maxOf(bounds.width(), bounds.height())
         val cx = bounds.centerX()
