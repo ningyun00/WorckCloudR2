@@ -723,9 +723,9 @@ fun WorkClockApp(context: Context) {
             } else if (!loggedIn) {
                 Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center) {
                     Text("欢迎回来", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Ink)
-                    Text("请使用管理员分配的六位工号登录", color = Muted)
+                    Text("请使用管理员分配的工号登录", color = Muted)
                     Spacer(Modifier.height(22.dp))
-                    OutlinedTextField(loginId, { loginId = it.filter(Char::isDigit).take(6) }, label = { Text("六位工号") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(loginId, { loginId = it }, label = { Text("工号") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     OutlinedTextField(loginPassword, { loginPassword = it }, label = { Text("密码") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     Spacer(Modifier.height(12.dp))
                     Button(enabled = !busy, onClick = {
@@ -1872,20 +1872,20 @@ fun WorkClockApp(context: Context) {
                             }
                             2 -> {
                                 Text("创建员工账号", color = Ink, fontWeight = FontWeight.Bold)
-                                OutlinedTextField(createId, { createId = it.filter(Char::isDigit).take(6) }, label = { Text("六位工号") }, singleLine = true)
+                                OutlinedTextField(createId, { createId = it }, label = { Text("工号") }, singleLine = true)
                                 OutlinedTextField(createName, { createName = it }, label = { Text("员工姓名") }, singleLine = true)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     FilterChip(selected = createRole == "employee", onClick = { createRole = "employee" }, label = { Text("普通员工") })
                                     FilterChip(selected = createRole == "admin", onClick = { createRole = "admin" }, label = { Text("管理员") })
                                 }
-                                Text("可输入 1–6 位数字，系统自动补足六位；初始密码为六位工号，首次登录需要修改。", color = Muted, fontSize = 12.sp)
-                                Button(enabled = !creatingEmployee && createId.length in 1..6 && createId.all { it.isDigit() } && createName.isNotBlank(), onClick = {
+                                Text("工号按输入内容保存，不限制位数；初始密码为工号，首次登录需要修改。", color = Muted, fontSize = 12.sp)
+                                Button(enabled = !creatingEmployee && createId.isNotBlank() && createName.isNotBlank(), onClick = {
                                     scope.launch {
                                         creatingEmployee = true
                                         try {
-                                            val normalizedId = createId.trim().padStart(6, '0')
+                                            val rawId = createId.trim()
                                             val store = R2Store(R2Config(account,bucket,access,secret,ssid))
-                                            val list = store.readEmployeesAsync(); require(list.none { it.employeeId == normalizedId }) { "该工号已存在" }; store.writeEmployeesAsync(list + R2Store.createEmployee(normalizedId,createName.trim(),createRole,normalizedId,true,true))
+                                            val list = store.readEmployeesAsync(); require(list.none { it.employeeId == rawId }) { "该工号已存在" }; store.writeEmployeesAsync(list + R2Store.createEmployee(rawId,createName.trim(),createRole,rawId,true,true))
                                             message = "账号创建成功，工号：${createId.trim().padStart(6, '0')}，初始密码为该六位工号"; createId = ""; createName = ""
                                         } catch (e: Exception) { message = "创建失败：" + (e.message ?: "请检查 R2 写权限") }
                                         finally { creatingEmployee = false }
