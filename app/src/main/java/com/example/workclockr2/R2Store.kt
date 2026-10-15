@@ -122,25 +122,53 @@ class R2Store(private val config: R2Config) {
     }
 
     fun readPunches(month: String): List<Punch> {
-        val key = "attendance/$month.json"
-        var raw = readText(key)
-        if (raw == null) {
-            // First use of a month: create the JSON object explicitly, then read it back.
-            writeText(key, "[]")
-            raw = readText(key)
-                ?: throw IllegalStateException("已创建 $key，但重新读取仍不存在；请检查 R2 写入/读取权限")
+        val yearMonth = try { java.time.YearMonth.parse(month) } catch (e: Exception) {
+            throw IllegalArgumentException("月份格式应为 yyyy-MM：$month", e)
         }
-        return try {
-            val type = object : TypeToken<List<Punch>>() {}.type
-            gson.fromJson<List<Punch>>(raw, type)
-                ?: throw IllegalStateException("$key 内容为空或不是有效的考勤 JSON 数组")
-        } catch (e: Exception) {
-            throw IllegalStateException("读取 $key 失败，文件内容不是有效 JSON；为避免覆盖原数据，已停止写入。原因：${e.message}", e)
+        val daily = mutableListOf<Punch>()
+        var foundDailyFile = false
+        for (day in 1..yearMonth.lengthOfMonth()) {
+            val date = yearMonth.atDay(day).toString()
+            val raw = readText("attendance/$month/$date.json") ?: continue
+            foundDailyFile = true
+            daily += parsePunches("attendance/$month/$date.json", raw)
         }
+        if (foundDailyFile) return daily.distinctBy { it.id }
+
+        // Migrate older monthly files on first read; keep the legacy file as a backup.
+        val legacyKey = "attendance/$month.json"
+        val legacyRaw = readText(legacyKey)
+        if (legacyRaw != null) {
+            val legacy = parsePunches(legacyKey, legacyRaw)
+            legacy.groupBy { it.day }.forEach { (date, rows) ->
+                writeText("attendance/$month/$date.json", gson.toJson(rows))
+            }
+            return legacy.distinctBy { it.id }
+        }
+        return emptyList()
+    }
+
+    private fun parsePunches(key: String, raw: String): List<Punch> = try {
+        val type = object : TypeToken<List<Punch>>() {}.type
+        gson.fromJson<List<Punch>>(raw, type)
+            ?: throw IllegalStateException("$key 内容为空或不是有效的考勤 JSON 数组")
+    } catch (e: Exception) {
+        throw IllegalStateException("读取 $key 失败，文件内容不是有效 JSON；为避免覆盖原数据，已停止写入。原因：${e.message}", e)
     }
 
     fun writePunches(month: String, punches: List<Punch>) {
-        writeText("attendance/$month.json", gson.toJson(punches))
+        val yearMonth = try { java.time.YearMonth.parse(month) } catch (e: Exception) {
+            throw IllegalArgumentException("月份格式应为 yyyy-MM：$month", e)
+        }
+        val grouped = punches.filter { it.day.startsWith("$month-") }.groupBy { it.day }
+        // Clear previously existing daily files too, so edits/deletions do not leave stale records.
+        for (day in 1..yearMonth.lengthOfMonth()) {
+            val date = yearMonth.atDay(day).toString()
+            val key = "attendance/$month/$date.json"
+            if (readText(key) != null || grouped.containsKey(date)) {
+                writeText(key, gson.toJson(grouped[date].orEmpty()))
+            }
+        }
     }
 
     companion object {
