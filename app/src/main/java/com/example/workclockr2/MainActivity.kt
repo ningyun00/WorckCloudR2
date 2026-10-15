@@ -1609,11 +1609,17 @@ fun WorkClockApp(context: Context) {
                                     Text("当天暂无打卡记录", color = Muted, modifier = Modifier.padding(vertical = 16.dp))
                                 } else {
                                     val homePunchDetails = buildList {
-                                        dayPunches.filter { it.type == "IN" }.minByOrNull { it.at }?.let { add(it) }
-                                        dayPunches.filter { it.type == "TEMP_OUT" }.maxByOrNull { it.at }?.let { temp ->
-                                            if (none { it.id == temp.id }) add(temp)
+                                        val ordered = dayPunches.sortedBy { it.at }
+                                        val tempIndex = ordered.indexOfLast { it.type == "TEMP_OUT" }
+                                        ordered.firstOrNull { it.type == "IN" }?.let { add(it) }
+                                        if (tempIndex >= 0) {
+                                            ordered.take(tempIndex).lastOrNull { it.type == "OUT" }?.let { add(it) }
+                                            add(ordered[tempIndex])
+                                            ordered.drop(tempIndex + 1).firstOrNull { it.type == "IN" }?.let { nextIn ->
+                                                if (none { it.id == nextIn.id }) add(nextIn)
+                                            }
                                         }
-                                        dayPunches.filter { it.type == "OUT" }.maxByOrNull { it.at }?.let { lastOut ->
+                                        ordered.lastOrNull { it.type == "OUT" }?.let { lastOut ->
                                             if (none { it.id == lastOut.id }) add(lastOut)
                                         }
                                     }.sortedBy { it.at }
