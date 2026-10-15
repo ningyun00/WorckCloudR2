@@ -930,120 +930,167 @@ fun WorkClockApp(context: Context) {
                                     onDragCancel = { totalDrag = 0f }
                                 )
                             }
-                            .verticalScroll(rememberScrollState())
-                            .padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = { showProfile = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回打卡") }
-                        Spacer(Modifier.weight(1f)); Icon(Icons.Default.AutoAwesome, null, tint = Blue)
-                    }
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
-                        Box(Modifier.fillMaxWidth()) {
-                            if (profileBackgroundImage != null) {
-                                Image(
-                                    profileBackgroundImage!!.asImageBitmap(),
-                                    "已上传的背景图片",
-                                    Modifier.matchParentSize().clip(RoundedCornerShape(28.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
+                        Row(
+                            Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(
+                                onClick = { showProfile = false },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                            ) {
+                                Icon(Icons.Default.ArrowBack, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("返回打卡", fontSize = 13.sp)
                             }
-                            Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Box(
-                                    Modifier.size(124.dp)
-                                        .clip(RoundedCornerShape(18.dp))
-                                        .background(Color.Transparent)
-                                        .clickable { if (profileAvatar != null) showAvatarPreview = true },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (profileAvatar != null) {
-                                        Image(profileAvatar!!.asImageBitmap(), "个人头像，点击放大", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                    } else {
-                                        Icon(Icons.Default.AccountCircle, null, tint = if (profileBackgroundImage != null) Color.White else Blue, modifier = Modifier.size(82.dp))
+                            Spacer(Modifier.weight(1f))
+                            Icon(Icons.Default.AutoAwesome, null, tint = Blue, modifier = Modifier.size(18.dp))
+                        }
+
+                        Column(
+                            Modifier.weight(1f).fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 18.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
+                                Box(Modifier.fillMaxWidth()) {
+                                    if (profileBackgroundImage != null) {
+                                        Image(
+                                            profileBackgroundImage!!.asImageBitmap(),
+                                            "已上传的背景图片",
+                                            Modifier.matchParentSize().clip(RoundedCornerShape(28.dp)),
+                                            contentScale = ContentScale.Crop
+                                        )
                                     }
-                                }
-                                if (showAvatarPreview && profileAvatar != null) {
-                                    androidx.compose.ui.window.Dialog(onDismissRequest = { showAvatarPreview = false }) {
+                                    Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Box(
-                                            Modifier.fillMaxWidth().background(Color.Transparent).clickable { showAvatarPreview = false },
+                                            Modifier.size(100.dp)
+                                                .clip(RoundedCornerShape(18.dp))
+                                                .background(Color.Transparent)
+                                                .clickable { if (profileAvatar != null) showAvatarPreview = true },
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Image(
-                                                profileAvatar!!.asImageBitmap(),
-                                                "放大后的个人头像，点击关闭",
-                                                Modifier.fillMaxWidth().heightIn(max = 560.dp),
-                                                contentScale = ContentScale.Fit
-                                            )
+                                            if (profileAvatar != null) {
+                                                Image(profileAvatar!!.asImageBitmap(), "个人头像，点击放大", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                            } else {
+                                                Icon(Icons.Default.AccountCircle, null, tint = if (profileBackgroundImage != null) Color.White else Blue, modifier = Modifier.size(72.dp))
+                                            }
                                         }
+                                        if (showAvatarPreview && profileAvatar != null) {
+                                            androidx.compose.ui.window.Dialog(onDismissRequest = { showAvatarPreview = false }) {
+                                                Box(
+                                                    Modifier.fillMaxWidth().background(Color.Transparent).clickable { showAvatarPreview = false },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Image(
+                                                        profileAvatar!!.asImageBitmap(),
+                                                        "放大后的个人头像，点击关闭",
+                                                        Modifier.fillMaxWidth().heightIn(max = 560.dp),
+                                                        contentScale = ContentScale.Fit
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Text(profileName.ifBlank { employeeName }, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = if (profileBackgroundImage != null) Color.White else Ink)
+                                        Text("个人空间 · " + if (role == "admin") "管理员" else "员工", color = if (profileBackgroundImage != null) Color.White else Muted, fontSize = 13.sp)
+                                        Text("工号：" + employeeId, color = if (profileBackgroundImage != null) Color.White else Blue, fontWeight = FontWeight.Medium)
                                     }
                                 }
-                                Text(profileName.ifBlank { employeeName }, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, color = if (profileBackgroundImage != null) Color.White else Ink)
-                                Text("个人空间 · " + if (role == "admin") "管理员" else "员工", color = if (profileBackgroundImage != null) Color.White else Muted, fontSize = 13.sp)
-                                Text("工号：" + employeeId, color = if (profileBackgroundImage != null) Color.White else Blue, fontWeight = FontWeight.Medium)
                             }
-                        }
-                    }
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
-                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Row(Modifier.fillMaxWidth().clickable { profilePersonalExpanded = !profilePersonalExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
-                                Spacer(Modifier.weight(1f))
-                                Icon(if (profilePersonalExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profilePersonalExpanded) "收起个人资料" else "展开个人资料", tint = Muted)
-                            }
-                            if (profilePersonalExpanded) {
-                            OutlinedTextField(profileName, { profileName = it }, label = { Text("姓名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("性别", color = Muted)
-                                listOf("男", "女", "未设置").forEach { g -> FilterChip(selected = profileGender == g, onClick = { profileGender = g }, label = { Text(g) }) }
-                            }
-                            OutlinedTextField(profileAge, { profileAge = it.filter(Char::isDigit).take(3) }, label = { Text("年龄") }, suffix = { Text("岁") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            }
-                            Row(Modifier.fillMaxWidth().clickable { profileContactExpanded = !profileContactExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("联系方式", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
-                                Spacer(Modifier.weight(1f))
-                                Icon(if (profileContactExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profileContactExpanded) "收起联系方式" else "展开联系方式", tint = Muted)
-                            }
-                            if (profileContactExpanded) {
-                            OutlinedTextField(profilePhone, { profilePhone = it.take(30) }, label = { Text("手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            OutlinedTextField(profileWechat, { profileWechat = it.take(60) }, label = { Text("微信号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            OutlinedTextField(profileQq, { profileQq = it.take(30) }, label = { Text("QQ 号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            OutlinedTextField(profileEmail, { profileEmail = it.take(120) }, label = { Text("邮箱") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            }
-                            Row(Modifier.fillMaxWidth().clickable { profileOtherExpanded = !profileOtherExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("其他资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
-                                Spacer(Modifier.weight(1f))
-                                Icon(if (profileOtherExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profileOtherExpanded) "收起其他资料" else "展开其他资料", tint = Muted)
-                            }
-                            if (profileOtherExpanded) {
-                            OutlinedTextField(profileOccupation, { profileOccupation = it.take(80) }, label = { Text("职业/岗位") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            OutlinedTextField(profileAddress, { profileAddress = it.take(200) }, label = { Text("联系地址（选填）") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-                            OutlinedTextField(profileEmergencyContact, { profileEmergencyContact = it.take(80) }, label = { Text("紧急联系人（选填）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            OutlinedTextField(profileEmergencyPhone, { profileEmergencyPhone = it.take(30) }, label = { Text("紧急联系人电话（选填）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            OutlinedTextField(profileBio, { profileBio = it.take(300) }, label = { Text("个人简介（选填）") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
-                            }
-                            OutlinedButton(enabled = !profileLoading, onClick = { backgroundPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
-                                Icon(Icons.Default.Image, null); Spacer(Modifier.width(8.dp)); Text(if (profileLoading) "处理中…" else "上传/更换背景图片")
-                            }
-
-                            OutlinedButton(enabled = !profileLoading, onClick = { avatarPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.AddAPhoto, null); Spacer(Modifier.width(8.dp)); Text("上传/更换头像（保存至 R2）") }
-                            Button(enabled = !profileLoading && profileName.isNotBlank() && (profileAge.isBlank() || (profileAge.toIntOrNull() ?: 999) <= 120), onClick = {
-                                scope.launch {
-                                    profileLoading = true
-                                    try {
-                                        val store = R2Store(R2Config(account, bucket, access, secret, ssid))
-                                        store.writeProfileAsync(ProfileData(employeeId, profileName.trim(), profileGender, profileAge, "profiles/avatars/" + employeeId + ".jpg", profileBackground, profilePhone.trim(), profileWechat.trim(), profileQq.trim(), profileEmail.trim(), profileAddress.trim(), profileEmergencyContact.trim(), profileEmergencyPhone.trim(), profileOccupation.trim(), profileBio.trim()))
-                                        prefs.edit().putString("name", profileName.trim()).apply()
-                                        employeeName = profileName.trim()
-                                        profileMessage = "个人资料已保存到 R2。"
-                                    } catch (e: Exception) { profileMessage = "保存失败：" + (e.message ?: e.javaClass.simpleName) }
-                                    finally { profileLoading = false }
+                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
+                                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Row(Modifier.fillMaxWidth().clickable { profilePersonalExpanded = !profilePersonalExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                        Spacer(Modifier.weight(1f))
+                                        Icon(if (profilePersonalExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profilePersonalExpanded) "收起个人资料" else "展开个人资料", tint = Muted)
+                                    }
+                                    if (profilePersonalExpanded) {
+                                        OutlinedTextField(profileName, { profileName = it }, label = { Text("姓名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Text("性别", color = Muted)
+                                            listOf("男", "女", "未设置").forEach { g -> FilterChip(selected = profileGender == g, onClick = { profileGender = g }, label = { Text(g) }) }
+                                        }
+                                        OutlinedTextField(profileAge, { profileAge = it.filter(Char::isDigit).take(3) }, label = { Text("年龄") }, suffix = { Text("岁") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                    }
+                                    Row(Modifier.fillMaxWidth().clickable { profileContactExpanded = !profileContactExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text("联系方式", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                        Spacer(Modifier.weight(1f))
+                                        Icon(if (profileContactExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profileContactExpanded) "收起联系方式" else "展开联系方式", tint = Muted)
+                                    }
+                                    if (profileContactExpanded) {
+                                        OutlinedTextField(profilePhone, { profilePhone = it.take(30) }, label = { Text("手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                        OutlinedTextField(profileWechat, { profileWechat = it.take(60) }, label = { Text("微信号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                        OutlinedTextField(profileQq, { profileQq = it.take(30) }, label = { Text("QQ 号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                        OutlinedTextField(profileEmail, { profileEmail = it.take(120) }, label = { Text("邮箱") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                    }
+                                    Row(Modifier.fillMaxWidth().clickable { profileOtherExpanded = !profileOtherExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text("其他资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                        Spacer(Modifier.weight(1f))
+                                        Icon(if (profileOtherExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profileOtherExpanded) "收起其他资料" else "展开其他资料", tint = Muted)
+                                    }
+                                    if (profileOtherExpanded) {
+                                        OutlinedTextField(profileOccupation, { profileOccupation = it.take(80) }, label = { Text("职业/岗位") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                        OutlinedTextField(profileAddress, { profileAddress = it.take(200) }, label = { Text("联系地址（选填）") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                                        OutlinedTextField(profileEmergencyContact, { profileEmergencyContact = it.take(80) }, label = { Text("紧急联系人（选填）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                        OutlinedTextField(profileEmergencyPhone, { profileEmergencyPhone = it.take(30) }, label = { Text("紧急联系人电话（选填）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                        OutlinedTextField(profileBio, { profileBio = it.take(300) }, label = { Text("个人简介（选填）") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
+                                    }
                                 }
-                            }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text(if (profileLoading) "保存中…" else "保存个人资料") }
+                            }
                             if (profileMessage.isNotBlank()) Text(profileMessage, color = Blue, fontSize = 13.sp)
+                            Text("轻松工作，自信生活 ✨", color = Muted, fontSize = 12.sp)
                         }
-                    }
-                    Text("轻松工作，自信生活 ✨", color = Muted, fontSize = 12.sp)
+
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                enabled = !profileLoading,
+                                onClick = { avatarPicker.launch("image/*") },
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                            ) {
+                                Icon(Icons.Default.AddAPhoto, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("上传头像", fontSize = 12.sp, maxLines = 1)
+                            }
+                            OutlinedButton(
+                                enabled = !profileLoading,
+                                onClick = { backgroundPicker.launch("image/*") },
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                            ) {
+                                Icon(Icons.Default.Image, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("上传背景", fontSize = 12.sp, maxLines = 1)
+                            }
+                            Button(
+                                enabled = !profileLoading && profileName.isNotBlank() && (profileAge.isBlank() || (profileAge.toIntOrNull() ?: 999) <= 120),
+                                onClick = {
+                                    scope.launch {
+                                        profileLoading = true
+                                        try {
+                                            val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                                            store.writeProfileAsync(ProfileData(employeeId, profileName.trim(), profileGender, profileAge, "profiles/avatars/" + employeeId + ".jpg", profileBackground, profilePhone.trim(), profileWechat.trim(), profileQq.trim(), profileEmail.trim(), profileAddress.trim(), profileEmergencyContact.trim(), profileEmergencyPhone.trim(), profileOccupation.trim(), profileBio.trim()))
+                                            prefs.edit().putString("name", profileName.trim()).apply()
+                                            employeeName = profileName.trim()
+                                            profileMessage = "个人资料已保存到 R2。"
+                                        } catch (e: Exception) { profileMessage = "保存失败：" + (e.message ?: e.javaClass.simpleName) }
+                                        finally { profileLoading = false }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                            ) {
+                                Icon(Icons.Default.Save, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(if (profileLoading) "保存资料…" else "保存资料", fontSize = 12.sp, maxLines = 1)
+                            }
+                        }
                     }
                 }
             } else if (showMakeUpRecords && role == "admin") {
