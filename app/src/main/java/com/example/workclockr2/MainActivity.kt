@@ -1993,9 +1993,11 @@ private fun calculateHours(items: List<Punch>): Double {
                 if (start != null) lastOut = at
             }
             "TEMP_OUT" -> {
-                // Temporary departure closes the current interval at the TEMP_OUT timestamp itself.
+                // Count only confirmed work time: close at the latest ordinary OUT, not at TEMP_OUT.
                 if (start != null) {
-                    total += Duration.between(start, at).toMillis().coerceAtLeast(0)
+                    if (lastOut != null) {
+                        total += Duration.between(start, lastOut!!).toMillis().coerceAtLeast(0)
+                    }
                     start = null
                     lastOut = null
                 }
