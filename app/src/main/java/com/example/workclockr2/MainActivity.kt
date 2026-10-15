@@ -1419,8 +1419,10 @@ fun WorkClockApp(context: Context) {
                                         val avatarBytes = store.readBinaryAsync(data?.avatarKey ?: "profiles/avatars/" + employeeId + ".jpg")
                                         profileAvatar = avatarBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
 
-                                        val backgroundBytes = store.readBinaryAsync("profiles/backgrounds/" + employeeId + ".jpg")
-                                        profileBackgroundImage = backgroundBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                                        profileBackgroundImage = readProfileBackgroundFromR2(
+                                            R2Config(account, bucket, access, secret, ssid),
+                                            employeeId
+                                        )
                                     } catch (e: Exception) { profileMessage = "读取个人资料失败：" + (e.message ?: e.javaClass.simpleName) }
                                     finally { profileLoading = false }
                                 }
