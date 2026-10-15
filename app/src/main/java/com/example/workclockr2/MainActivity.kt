@@ -1767,8 +1767,8 @@ fun WorkClockApp(context: Context) {
                                     val startAt = date.atTime(LocalTime.parse(segment.start)).atZone(AppZone).toOffsetDateTime()
                                     val endAt = date.atTime(LocalTime.parse(segment.end)).atZone(AppZone).toOffsetDateTime()
                                     listOf(
-                                        Punch(id = "MAKEUP-$groupId-IN", employeeId = makeUpEmployeeId, at = startAt.toString(), type = "IN", day = date.toString()),
-                                        Punch(id = "MAKEUP-$groupId-OUT", employeeId = makeUpEmployeeId, at = endAt.toString(), type = "OUT", day = date.toString())
+                                        Punch(id = "MAKEUP-$groupId-IN", employeeId = makeUpEmployeeId, at = startAt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")), type = "IN", day = date.toString()),
+                                        Punch(id = "MAKEUP-$groupId-OUT", employeeId = makeUpEmployeeId, at = endAt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")), type = "OUT", day = date.toString())
                                     )
                                 }
                                 if (workerToken.isBlank()) error("登录状态已失效，请重新登录")
