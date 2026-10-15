@@ -20,7 +20,7 @@ data class AttendanceSession(
 data class WorkerPunchResult(val record: Punch)
 
 class AttendanceApi {
-    private val baseUrl = "https://workclockr2-auth.3174902862.workers.dev"
+    private val baseUrl = "https://cs.sixiaojie.dpdns.org"
 
     suspend fun login(employeeId: String, password: String): AttendanceSession = withContext(Dispatchers.IO) {
         val result = request("POST", "/api/session", body = JSONObject()
@@ -52,6 +52,20 @@ class AttendanceApi {
         request("POST", "/api/attendance", token = token, body = JSONObject()
             .put("id", id)
             .put("type", type)).getJSONObject("record").toPunch()
+    }
+
+    suspend fun addMakeUpRecords(token: String, records: List<Punch>) = withContext(Dispatchers.IO) {
+        val array = JSONArray()
+        records.forEach { record ->
+            array.put(JSONObject()
+                .put("id", record.id)
+                .put("employeeId", record.employeeId)
+                .put("at", record.at)
+                .put("type", record.type)
+                .put("day", record.day))
+        }
+        request("POST", "/api/admin/attendance/makeup", token = token, body = JSONObject().put("records", array))
+        Unit
     }
 
     suspend fun changePassword(token: String, currentPassword: String, newPassword: String) = withContext(Dispatchers.IO) {
