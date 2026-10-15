@@ -823,7 +823,7 @@ fun WorkClockApp(context: Context) {
                 val calendarCells: List<LocalDate?> = List(calendarStartOffset) { null } +
                     (1..reportMonth.lengthOfMonth()).map { reportMonth.atDay(it) }
                 val selectedDayPunches = selectedSummaryDay?.let { day ->
-                    empPunches.filter { it.day == day }.sortedByDescending { it.at }
+                    empPunches.filter { it.day == day }.sortedBy { it.at }
                 } ?: emptyList()
                 Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
