@@ -1765,19 +1765,19 @@ fun WorkClockApp(context: Context) {
                                 val store = R2Store(R2Config(account, bucket, access, secret, ssid))
                                 val additions = makeUpSegments.flatMap { segment ->
                                     val groupId = UUID.randomUUID().toString()
-                                    val startAt = date.atTime(LocalTime.parse(segment.start)).atZone(AppZone)
-                                    val endAt = date.atTime(LocalTime.parse(segment.end)).atZone(AppZone)
+                                    val startAt = date.atTime(LocalTime.parse(segment.start)).atZone(AppZone).toOffsetDateTime()
+                                    val endAt = date.atTime(LocalTime.parse(segment.end)).atZone(AppZone).toOffsetDateTime()
                                     listOf(
                                         Punch(id = "MAKEUP-$groupId-IN", employeeId = makeUpEmployeeId, at = startAt.toString(), type = "IN", day = date.toString()),
                                         Punch(id = "MAKEUP-$groupId-OUT", employeeId = makeUpEmployeeId, at = endAt.toString(), type = "OUT", day = date.toString())
                                     )
                                 }
+                                if (workerToken.isBlank()) error("登录状态已失效，请重新登录")
+                                attendanceApi.addMakeUpRecords(workerToken, additions)
                                 val month = date.format(DateTimeFormatter.ofPattern("yyyy-MM"))
-                                val existing = store.readPunchesAsync(month)
-                                store.writePunchesAsync(month, existing + additions)
-                                val confirmed = store.readPunchesAsync(month)
-                                check(additions.all { added -> confirmed.any { it.id == added.id } }) { "补班记录写入后回读验证失败" }
-                                if (month == LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM")) && makeUpEmployeeId == employeeId) punchList = confirmed.filter { it.employeeId == employeeId }
+                                if (month == LocalDate.now(AppZone).format(DateTimeFormatter.ofPattern("yyyy-MM")) && makeUpEmployeeId == employeeId) {
+                                    punchList = attendanceApi.punchesForMonth(workerToken, month)
+                                }
                                 showMakeUpDialog = false
                                 message = "补班成功：${makeUpEmployees.firstOrNull { it.employeeId == makeUpEmployeeId }?.displayName ?: makeUpEmployeeId}，${date}，已添加 ${makeUpSegments.size} 个时间段。"
                             } catch (e: Exception) {
