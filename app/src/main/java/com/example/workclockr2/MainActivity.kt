@@ -195,37 +195,6 @@ fun WorkClockApp(context: Context) {
             finally { profileLoading = false }
         }
     }
-    LaunchedEffect(employeeId, account, access, secret, ssid) {
-        if (employeeId.isNotBlank() && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) {
-            try {
-                val store = R2Store(R2Config(account, bucket, access, secret, ssid))
-                val bytes = store.readBinaryAsync("profiles/backgrounds/" + employeeId + ".jpg")
-                profileBackgroundImage = bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-                val profile = store.readProfileAsync(employeeId)
-                if (profile != null) {
-                    profileName = profile.name
-                    profileGender = profile.gender
-                    profileAge = profile.age
-                    // Gson leaves newly added fields null when reading older profile JSON.
-                    // Normalize them before passing values to Compose text fields.
-                    profilePhone = profile.phone.orEmpty()
-                    profileWechat = profile.wechat.orEmpty()
-                    profileQq = profile.qq.orEmpty()
-                    profileEmail = profile.email.orEmpty()
-                    profileAddress = profile.address.orEmpty()
-                    profileEmergencyContact = profile.emergencyContact.orEmpty()
-                    profileEmergencyPhone = profile.emergencyPhone.orEmpty()
-                    profileOccupation = profile.occupation.orEmpty()
-                    profileBio = profile.bio.orEmpty()
-                    profileBackground = profile.background
-                    val avatarBytes = store.readBinaryAsync(profile.avatarKey)
-                    profileAvatar = avatarBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-                }
-            } catch (e: Exception) {
-                Log.e("WorkClockProfile", "读取个人背景/资料失败", e)
-            }
-        }
-    }
     var showMakeUpRecords by remember { mutableStateOf(false) }
     var makeUpQueryEmployee by remember { mutableStateOf("") }
     var makeUpQueryStart by remember { mutableStateOf(LocalDate.now().withDayOfMonth(1).toString()) }
@@ -301,28 +270,24 @@ fun WorkClockApp(context: Context) {
                 } else if (!savedLoggedIn) {
                     loggedIn = false
                 }
-                if (loggedIn && account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) {
-                    // Refresh attendance automatically whenever the app returns to the foreground.
+                if (loggedIn && !showProfile && !showAdminSummary && selectedSummaryEmployee == null &&
+                    selectedSummaryDay == null && !showMakeUpRecords && editingMakeUpGroup == null &&
+                    account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) {
+                    // Home priority: fetch today's punches first, then this month's records.
                     scope.launch {
                         try {
-                            val currentMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"))
+                            val currentMonth = LocalDate.now(AppZone).format(DateTimeFormatter.ofPattern("yyyy-MM"))
                             val store = R2Store(R2Config(account, bucket, access, secret, ssid))
                             val todayKey = LocalDate.now(AppZone).toString()
                             val todays = store.readPunchesForDayAsync(todayKey).filter { it.employeeId == employeeId }
                             punchList = todays
-                            scope.launch {
-                                try {
-                                    val monthRows = store.readPunchesAsync(currentMonth).filter { it.employeeId == employeeId }
-                                    punchList = (monthRows.filterNot { it.day == todayKey } + todays).distinctBy { it.id }
-                                } catch (e: Exception) {
-                                    Log.e("WorkClockRefresh", "后台加载月度考勤失败", e)
-                                }
-                            }
                             val lastTemp = todays.indexOfLast { it.type == "TEMP_OUT" }
                             status = if (todays.drop(lastTemp + 1).any { it.type == "IN" }) "已上班" else if (todays.isNotEmpty()) "已打卡" else "尚未打卡"
-                            if (showAdminSummary && role == "admin") {
-                                summaryEmployees = store.readEmployeesAsync().filter { it.enabled }
-                                summaryPunches = store.readPunchesAsync(currentMonth)
+                            try {
+                                val monthRows = store.readPunchesAsync(currentMonth).filter { it.employeeId == employeeId }
+                                punchList = (monthRows.filterNot { it.day == todayKey } + todays).distinctBy { it.id }
+                            } catch (e: Exception) {
+                                Log.e("WorkClockRefresh", "后台加载月度考勤失败", e)
                             }
                         } catch (e: CancellationException) {
                             throw e
@@ -1586,7 +1551,16 @@ fun WorkClockApp(context: Context) {
                                                             .clickable { selectedDay = d }.padding(vertical = 5.dp),
                                                         horizontalAlignment = Alignment.CenterHorizontally
                                                     ) {
-                                                        Text(d.dayOfMonth.toString(), color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                        val dayRows = punchList.filter { it.day == d.toString() }
+                                                        val hasIn = dayRows.any { it.type == "IN" }
+                                                        val hasOut = dayRows.any { it.type == "OUT" }
+                                                        Box(Modifier.fillMaxWidth().height(17.dp), contentAlignment = Alignment.Center) {
+                                                            Text(d.dayOfMonth.toString(), color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                            if (hasIn && !hasOut) {
+                                                                Text("缺", color = Color(0xFFE05A5A), fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                                                                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 3.dp))
+                                                            }
+                                                        }
                                                         Spacer(Modifier.height(2.dp))
                                                         Text(if (has) String.format("%.1f", dayHours) else "—", color = if (has) Blue else Muted, fontSize = 9.sp, maxLines = 1)
                                                     }
