@@ -53,6 +53,9 @@ import java.util.UUID
 private val Blue = Color(0xFF1769E0)
 private val Ink = Color(0xFF142238)
 private val Muted = Color(0xFF758198)
+private val AppZone = ZoneOffset.ofHours(8)
+private val DisplayTime = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
+private fun formatAppDateTime(value: String, pattern: DateTimeFormatter): String = runCatching { ZonedDateTime.parse(value).withZoneSameInstant(AppZone).format(pattern) }.getOrDefault(value.replace("T", " ").take(23))
 
 data class R2Config(val accountId: String, val bucket: String, val accessKey: String, val secretKey: String, val allowedSsid: String)
 data class Punch(val id: String = UUID.randomUUID().toString(), val employeeId: String, val at: String, val type: String, val day: String)
@@ -96,7 +99,7 @@ fun WorkClockApp(context: Context) {
     var role by remember { mutableStateOf(prefs.getString("role", "") ?: "") }
     var loggedIn by remember { mutableStateOf(prefs.getBoolean("loggedIn", false)) }
     var punchList by remember { mutableStateOf(listOf<Punch>()) }
-    var selectedDay by remember { mutableStateOf(LocalDate.now()) }
+    var selectedDay by remember { mutableStateOf(LocalDate.now(AppZone)) }
     var showMonthCalendar by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("尚未打卡") }
     var message by remember { mutableStateOf("") }
@@ -328,7 +331,7 @@ fun WorkClockApp(context: Context) {
     val restrictedUserSettings = configured && loggedIn && role != "admin"
     val hideR2Credentials = configured && !configUnlocked
     val today = LocalDate.now()
-    val fmt = DateTimeFormatter.ofPattern("HH:mm:ss")
+    val fmt = DisplayTime
     val dayPunches = punchList.filter { it.day == selectedDay.toString() }.sortedByDescending { it.at }
     val monthKey = today.format(DateTimeFormatter.ofPattern("yyyy-MM"))
     val todayPunches = punchList.filter { it.day == today.toString() }.sortedBy { it.at }
@@ -472,7 +475,7 @@ fun WorkClockApp(context: Context) {
                 }
                 message = "正在保存打卡记录…"
                 val cfg = R2Config(account, bucket, access, secret, allowedSsid)
-                val now = ZonedDateTime.now().toString()
+                val now = ZonedDateTime.now(AppZone).toString()
                 val punch = Punch(employeeId = employeeId, at = now, type = type, day = today.toString())
                 val saved = R2Store(cfg).updatePunchesAndVerifyAsync(monthKey, punch)
                 punchList = saved.filter { it.employeeId == employeeId }
@@ -1196,13 +1199,13 @@ fun WorkClockApp(context: Context) {
                             Card(colors = CardDefaults.cardColors(containerColor = cardBackground), shape = RoundedCornerShape(14.dp)) {
                                 Column(Modifier.fillMaxWidth().padding(12.dp)) {
                                     Text("${emp?.displayName ?: start.employeeId}（${start.employeeId}）", color = Ink, fontWeight = FontWeight.Bold)
-                                    Text("${start.day} · ${runCatching { ZonedDateTime.parse(start.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault(start.at.takeLast(8).take(5))} - ${runCatching { ZonedDateTime.parse(end.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault(end.at.takeLast(8).take(5))}", color = Blue, fontWeight = FontWeight.Medium)
+                                    Text("${start.day} · ${formatAppDateTime(start.at, DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))} - ${formatAppDateTime(end.at, DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))}", color = Blue, fontWeight = FontWeight.Medium)
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         TextButton(onClick = {
                                             editingMakeUpGroup = groupId
                                             editingMakeUpDate = start.day
-                                            editingMakeUpStart = runCatching { ZonedDateTime.parse(start.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault("09:00")
-                                            editingMakeUpEnd = runCatching { ZonedDateTime.parse(end.at).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault("18:00")
+                                            editingMakeUpStart = runCatching { ZonedDateTime.parse(start.at).withZoneSameInstant(AppZone).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault("09:00")
+                                            editingMakeUpEnd = runCatching { ZonedDateTime.parse(end.at).withZoneSameInstant(AppZone).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault("18:00")
                                             makeUpEmployeeId = start.employeeId
                                         }) { Icon(Icons.Default.Edit, null); Text("修改") }
                                         TextButton(onClick = { pendingDeleteMakeUp = start to end }) { Icon(Icons.Default.Delete, null); Text("删除") }
@@ -1282,8 +1285,8 @@ fun WorkClockApp(context: Context) {
                                         val oldStart = start!!
                                         val oldEnd = end!!
                                         val date = LocalDate.parse(editingMakeUpDate)
-                                        val newStart = oldStart.copy(at = date.atTime(LocalTime.parse(editingMakeUpStart)).atZone(ZoneId.systemDefault()).toString(), day = date.toString())
-                                        val newEnd = oldEnd.copy(at = date.atTime(LocalTime.parse(editingMakeUpEnd)).atZone(ZoneId.systemDefault()).toString(), day = date.toString())
+                                        val newStart = oldStart.copy(at = date.atTime(LocalTime.parse(editingMakeUpStart)).atZone(AppZone).toString(), day = date.toString())
+                                        val newEnd = oldEnd.copy(at = date.atTime(LocalTime.parse(editingMakeUpEnd)).atZone(AppZone).toString(), day = date.toString())
                                         val store = R2Store(R2Config(account, bucket, access, secret, ssid))
                                         val oldMonth = oldStart.day.take(7)
                                         val newMonth = date.toString().take(7)
@@ -1673,7 +1676,7 @@ fun WorkClockApp(context: Context) {
                             ) { DatePicker(state = datePickerState) }
                         }
                         OutlinedButton(
-                            onClick = { makeUpSegments = makeUpSegments + MakeUpSegment() },
+                            onClick = { makeUpSegments = listOf(MakeUpSegment()) + makeUpSegments },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Default.Add, null)
@@ -1695,12 +1698,14 @@ fun WorkClockApp(context: Context) {
                                     var showEndTimePicker by remember(index) { mutableStateOf(false) }
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         OutlinedTextField(
+                                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Ink, unfocusedTextColor = Ink, focusedLabelColor = Blue, unfocusedLabelColor = Muted, focusedBorderColor = Blue, unfocusedBorderColor = Muted, focusedContainerColor = cardBackground, unfocusedContainerColor = cardBackground),
                                             value = segment.start, onValueChange = {}, readOnly = true,
                                             label = { Text("开始时间") },
                                             trailingIcon = { IconButton(onClick = { showStartTimePicker = true }) { Icon(Icons.Default.AccessTime, "选择开始时间") } },
                                             modifier = Modifier.weight(1f).clickable { showStartTimePicker = true }
                                         )
                                         OutlinedTextField(
+                                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Ink, unfocusedTextColor = Ink, focusedLabelColor = Blue, unfocusedLabelColor = Muted, focusedBorderColor = Blue, unfocusedBorderColor = Muted, focusedContainerColor = cardBackground, unfocusedContainerColor = cardBackground),
                                             value = segment.end, onValueChange = {}, readOnly = true,
                                             label = { Text("结束时间") },
                                             trailingIcon = { IconButton(onClick = { showEndTimePicker = true }) { Icon(Icons.Default.AccessTime, "选择结束时间") } },
@@ -1713,8 +1718,9 @@ fun WorkClockApp(context: Context) {
                                         val timePickerState = rememberTimePickerState(initialHour = initialTime.hour, initialMinute = initialTime.minute, is24Hour = true)
                                         AlertDialog(
                                             onDismissRequest = { showStartTimePicker = false; showEndTimePicker = false },
-                                            title = { Text(if (editingStart) "选择开始时间" else "选择结束时间") },
-                                            text = { TimePicker(state = timePickerState) },
+                                            title = { Text(if (editingStart) "选择开始时间" else "选择结束时间", color = Ink) },
+                                            containerColor = cardBackground,
+                                            text = { TimePicker(state = timePickerState, colors = TimePickerDefaults.colors(clockDialColor = selectedDayBackground, selectorColor = Blue, containerColor = cardBackground, periodSelectorBorderColor = Muted, timeSelectorSelectedContainerColor = Blue, timeSelectorUnselectedContainerColor = selectedDayBackground, timeSelectorSelectedContentColor = Color.White, timeSelectorUnselectedContentColor = Ink)) },
                                             confirmButton = {
                                                 TextButton(onClick = {
                                                     val value = "%02d:%02d".format(timePickerState.hour, timePickerState.minute)
@@ -1743,8 +1749,8 @@ fun WorkClockApp(context: Context) {
                                 val store = R2Store(R2Config(account, bucket, access, secret, ssid))
                                 val additions = makeUpSegments.flatMap { segment ->
                                     val groupId = UUID.randomUUID().toString()
-                                    val startAt = date.atTime(LocalTime.parse(segment.start)).atZone(ZoneId.systemDefault())
-                                    val endAt = date.atTime(LocalTime.parse(segment.end)).atZone(ZoneId.systemDefault())
+                                    val startAt = date.atTime(LocalTime.parse(segment.start)).atZone(AppZone)
+                                    val endAt = date.atTime(LocalTime.parse(segment.end)).atZone(AppZone)
                                     listOf(
                                         Punch(id = "MAKEUP-$groupId-IN", employeeId = makeUpEmployeeId, at = startAt.toString(), type = "IN", day = date.toString()),
                                         Punch(id = "MAKEUP-$groupId-OUT", employeeId = makeUpEmployeeId, at = endAt.toString(), type = "OUT", day = date.toString())
