@@ -307,9 +307,17 @@ fun WorkClockApp(context: Context) {
                         try {
                             val currentMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"))
                             val store = R2Store(R2Config(account, bucket, access, secret, ssid))
-                            punchList = store.readPunchesAsync(currentMonth).filter { it.employeeId == employeeId }
-                            val todayKey = LocalDate.now().toString()
-                            val todays = punchList.filter { it.day == todayKey }.sortedBy { it.at }
+                            val todayKey = LocalDate.now(AppZone).toString()
+                            val todays = store.readPunchesForDayAsync(todayKey).filter { it.employeeId == employeeId }
+                            punchList = todays
+                            scope.launch {
+                                try {
+                                    val monthRows = store.readPunchesAsync(currentMonth).filter { it.employeeId == employeeId }
+                                    punchList = (monthRows.filterNot { it.day == todayKey } + todays).distinctBy { it.id }
+                                } catch (e: Exception) {
+                                    Log.e("WorkClockRefresh", "后台加载月度考勤失败", e)
+                                }
+                            }
                             val lastTemp = todays.indexOfLast { it.type == "TEMP_OUT" }
                             status = if (todays.drop(lastTemp + 1).any { it.type == "IN" }) "已上班" else if (todays.isNotEmpty()) "已打卡" else "尚未打卡"
                             if (showAdminSummary && role == "admin") {
@@ -480,8 +488,9 @@ fun WorkClockApp(context: Context) {
                     if (type == "IN") currentTime.minusMinutes(1) else currentTime.plusMinutes(1)
                 }
                 val punch = Punch(employeeId = employeeId, at = punchTime.toString(), type = type, day = punchTime.toLocalDate().toString())
-                val saved = R2Store(cfg).updatePunchesAndVerifyAsync(punchTime.toLocalDate().toString().take(7), punch)
-                punchList = saved.filter { it.employeeId == employeeId }
+                val punchStore = R2Store(cfg)
+                val savedToday = punchStore.updatePunchForDayAndVerifyAsync(punch.day, punch)
+                punchList = (punchList.filterNot { it.day == punch.day } + savedToday.filter { it.employeeId == employeeId }).distinctBy { it.id }
                 status = when(type) { "IN" -> "已上班"; "OUT" -> "已下班"; else -> "临时下班已记录" }
                 message = "$status · 已保存并验证 · ${ZonedDateTime.now().format(fmt)}"
             } catch (t: Throwable) {
@@ -768,9 +777,17 @@ fun WorkClockApp(context: Context) {
                                     loggedIn = true; needChangePassword = emp.mustChangePassword
                                     prefs.edit().putString("employee", employeeId).putString("name", employeeName).putString("role", role).putBoolean("loggedIn", true).commit()
                                     try {
-                                        punchList = store.readPunchesAsync(monthKey).filter { it.employeeId == employeeId }
-                                        val todayKey = LocalDate.now().toString()
-                                        val todays = punchList.filter { it.day == todayKey }.sortedBy { it.at }
+                                        val todayKey = LocalDate.now(AppZone).toString()
+                                        val todays = store.readPunchesForDayAsync(todayKey).filter { it.employeeId == employeeId }
+                                        punchList = todays
+                                        scope.launch {
+                                            try {
+                                                val monthRows = store.readPunchesAsync(monthKey).filter { it.employeeId == employeeId }
+                                                punchList = (monthRows.filterNot { it.day == todayKey } + todays).distinctBy { it.id }
+                                            } catch (e: Exception) {
+                                                Log.e("WorkClockLogin", "后台加载月度考勤失败", e)
+                                            }
+                                        }
                                         val lastTemp = todays.indexOfLast { it.type == "TEMP_OUT" }
                                         status = if (todays.drop(lastTemp + 1).any { it.type == "IN" }) {
                                             "已上班"
