@@ -476,9 +476,11 @@ fun WorkClockApp(context: Context) {
                 }
                 message = "正在保存打卡记录…"
                 val cfg = R2Config(account, bucket, access, secret, allowedSsid)
-                val now = ZonedDateTime.now(AppZone).toString()
-                val punch = Punch(employeeId = employeeId, at = now, type = type, day = today.toString())
-                val saved = R2Store(cfg).updatePunchesAndVerifyAsync(monthKey, punch)
+                val punchTime = ZonedDateTime.now(AppZone).let { currentTime ->
+                    if (type == "IN") currentTime.minusMinutes(1) else currentTime.plusMinutes(1)
+                }
+                val punch = Punch(employeeId = employeeId, at = punchTime.toString(), type = type, day = punchTime.toLocalDate().toString())
+                val saved = R2Store(cfg).updatePunchesAndVerifyAsync(punchTime.toLocalDate().toString().take(7), punch)
                 punchList = saved.filter { it.employeeId == employeeId }
                 status = when(type) { "IN" -> "已上班"; "OUT" -> "已下班"; else -> "临时下班已记录" }
                 message = "$status · 已保存并验证 · ${ZonedDateTime.now().format(fmt)}"
