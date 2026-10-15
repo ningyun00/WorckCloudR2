@@ -23,6 +23,7 @@ import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Live front-camera preview. When exactly one sufficiently large face is detected,
@@ -42,14 +43,16 @@ fun LiveFaceCamera(
     val detector = remember {
         FaceDetection.getClient(
             FaceDetectorOptions.Builder()
-                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
-                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
                 .build()
         )
     }
 
     DisposableEffect(enabled, lifecycleOwner) {
         val sessionActive = AtomicBoolean(true)
+        val cameraReadyAt = AtomicLong(Long.MAX_VALUE)
+        val lastAnalysisAt = AtomicLong(0L)
         val providerFuture = ProcessCameraProvider.getInstance(context)
         if (enabled) {
             delivered.set(false)
@@ -62,9 +65,14 @@ fun LiveFaceCamera(
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                     analysis.setAnalyzer(executor) { proxy ->
-                        if (!sessionActive.get() || delivered.get()) {
+                        val now = System.currentTimeMillis()
+                        // Let the preview settle before starting face detection, then sample at 4 fps.
+                        if (now < cameraReadyAt.get() || now - lastAnalysisAt.get() < 250L) {
+                            proxy.close()
+                        } else if (!sessionActive.get() || delivered.get()) {
                             proxy.close()
                         } else {
+                            lastAnalysisAt.set(now)
                             val mediaImage = proxy.image
                             if (mediaImage == null) {
                                 proxy.close()
@@ -108,6 +116,7 @@ fun LiveFaceCamera(
                     }
                     provider.unbindAll()
                     provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis)
+                    cameraReadyAt.set(System.currentTimeMillis() + 1200L)
                     if (sessionActive.get()) onStatus("请正对前置摄像头，系统会自动识别，无需拍照")
                 } catch (e: Exception) {
                     if (sessionActive.get()) onStatus("无法启动前置摄像头：" + (e.message ?: e.javaClass.simpleName))
