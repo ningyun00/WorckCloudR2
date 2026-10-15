@@ -136,7 +136,7 @@ export default {
             if (Array.isArray(daily)) dailyRecords.push(...daily);
           }
           const all = dailyRecords.length ? dailyRecords : records;
-          return wrap(json(all.filter(x => x && x.employeeId === session.employeeId && x.day.startsWith(month))));
+          return wrap(json({ records: all.filter(x => x && x.employeeId === session.employeeId && x.day.startsWith(month)) }));
         }
         const day = url.searchParams.get("day") || chinaDateParts().day;
         if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(day) || !Number.isFinite(Date.parse(day + "T00:00:00Z"))) return wrap(fail(400, "日期格式无效"));
@@ -146,7 +146,7 @@ export default {
           const legacy = await readJsonObject(env.ATTENDANCE_BUCKET, "attendance/" + day.slice(0, 7) + ".json");
           records = Array.isArray(legacy) ? legacy.filter(x => x.day === day) : [];
         }
-        return wrap(json(records.filter(x => x && x.employeeId === session.employeeId)));
+        return wrap(json({ records: records.filter(x => x && x.employeeId === session.employeeId) }));
       }
       if (request.method === "POST" && url.pathname === "/api/attendance") {
         const body = await request.json().catch(() => null);
