@@ -18,6 +18,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -60,6 +61,8 @@ private fun formatAppDateTime(value: String, pattern: DateTimeFormatter): String
 data class R2Config(val accountId: String, val bucket: String, val accessKey: String, val secretKey: String, val allowedSsid: String)
 data class Punch(val id: String = UUID.randomUUID().toString(), val employeeId: String, val at: String, val type: String, val day: String)
 data class MakeUpSegment(val start: String = "09:00", val end: String = "18:00")
+data class ShiftSegment(val start: String = "09:00", val end: String = "18:00")
+data class ShiftSchedule(val id: String = UUID.randomUUID().toString(), val employeeId: String, val employeeName: String, val day: String, val segments: List<ShiftSegment>)
 data class Employee(val employeeId: String, val displayName: String, val role: String, val passwordSalt: String, val passwordHash: String, val mustChangePassword: Boolean, val enabled: Boolean)
 
 data class ProfileData(val employeeId: String, val name: String, val gender: String, val age: String, val avatarKey: String, val background: Int, val phone: String = "", val wechat: String = "", val qq: String = "", val email: String = "", val address: String = "", val emergencyContact: String = "", val emergencyPhone: String = "", val occupation: String = "", val bio: String = "")
@@ -139,6 +142,19 @@ fun WorkClockApp(context: Context) {
     var needChangePassword by remember { mutableStateOf(false) }
     var showAdminSummary by remember { mutableStateOf(false) }
     var showProfile by remember { mutableStateOf(false) }
+    var showSchedule by remember { mutableStateOf(false) }
+    var scheduleCalendarExpanded by remember { mutableStateOf(false) }
+    var selectedScheduleDate by remember { mutableStateOf(LocalDate.now(AppZone)) }
+    var scheduleItems by remember { mutableStateOf(listOf<ShiftSchedule>()) }
+    var scheduleEmployees by remember { mutableStateOf(listOf<Employee>()) }
+    var scheduleLoading by remember { mutableStateOf(false) }
+    var scheduleError by remember { mutableStateOf("") }
+    var showScheduleEditor by remember { mutableStateOf(false) }
+    var editingScheduleId by remember { mutableStateOf<String?>(null) }
+    var scheduleEmployeeId by remember { mutableStateOf("") }
+    var scheduleDate by remember { mutableStateOf(LocalDate.now(AppZone).toString()) }
+    var scheduleSegments by remember { mutableStateOf(listOf(ShiftSegment())) }
+    var scheduleEmployeeMenu by remember { mutableStateOf(false) }
     var profilePersonalExpanded by remember { mutableStateOf(false) }
     var profileContactExpanded by remember { mutableStateOf(false) }
     var profileOtherExpanded by remember { mutableStateOf(false) }
@@ -241,11 +257,12 @@ fun WorkClockApp(context: Context) {
     var summaryError by remember { mutableStateOf("") }
     var selectedSummaryEmployee by remember { mutableStateOf<Employee?>(null) }
     var selectedSummaryDay by remember { mutableStateOf<String?>(null) }
-    val canNavigateBack = showProfile || showAdminConfigAuth || showSettings || needChangePassword ||
+    val canNavigateBack = showProfile || showSchedule || showAdminConfigAuth || showSettings || needChangePassword ||
         (role == "admin" && (selectedSummaryDay != null || selectedSummaryEmployee != null || showAdminSummary || showMakeUpRecords || editingMakeUpGroup != null))
     BackHandler(enabled = canNavigateBack) {
         when {
             showProfile -> showProfile = false
+            showSchedule -> showSchedule = false
             showAdminConfigAuth -> {
                 showAdminConfigAuth = false
                 adminConfigPassword = ""
@@ -913,6 +930,80 @@ fun WorkClockApp(context: Context) {
                         Text("有打卡记录的日期会显示当天工时；点击任意日期可查看该日记录。", color = Muted, fontSize = 11.sp)
                     }
                 }
+             } else if (showSchedule && loggedIn) {
+                val weekStart = selectedScheduleDate.with(java.time.DayOfWeek.MONDAY)
+                val visibleScheduleItems = scheduleItems.filter { it.day == selectedScheduleDate.toString() && (role == "admin" || it.employeeId == employeeId) }.sortedWith(compareBy<ShiftSchedule> { it.employeeName }.thenBy { it.employeeId })
+                Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 10.dp, vertical = 6.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { showSchedule = false }) { Icon(Icons.Default.ArrowBack, null); Text("返回打卡") }
+                        Spacer(Modifier.weight(1f))
+                        Text("排班", color = Ink, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Spacer(Modifier.weight(1f))
+                        if (role == "admin") IconButton(onClick = { editingScheduleId = null; scheduleDate = selectedScheduleDate.toString(); scheduleEmployeeId = scheduleEmployees.firstOrNull()?.employeeId.orEmpty(); scheduleSegments = listOf(ShiftSegment()); showScheduleEditor = true }) { Icon(Icons.Default.Add, "添加排班", tint = Blue) }
+                    }
+                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = cardBackground), shape = RoundedCornerShape(12.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(8.dp)) {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text(if (scheduleCalendarExpanded) "日历 · ${selectedScheduleDate.year}年${selectedScheduleDate.monthValue}月" else "本周 · ${weekStart.format(DateTimeFormatter.ofPattern("MM-dd"))} 至 ${weekStart.plusDays(6).format(DateTimeFormatter.ofPattern("MM-dd"))}", color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.clickable { scheduleCalendarExpanded = !scheduleCalendarExpanded })
+                                Spacer(Modifier.weight(1f))
+                                IconButton(onClick = { scheduleCalendarExpanded = !scheduleCalendarExpanded }, modifier = Modifier.size(30.dp)) { Icon(if (scheduleCalendarExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (scheduleCalendarExpanded) "收起日历" else "展开日历", tint = Muted) }
+                            }
+                            if (!scheduleCalendarExpanded) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    (0..6).forEach { offset ->
+                                        val date = weekStart.plusDays(offset.toLong())
+                                        Column(Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (date == selectedScheduleDate) Blue else selectedDayBackground).clickable { selectedScheduleDate = date }.padding(vertical = 7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(listOf("一","二","三","四","五","六","日")[offset], color = if (date == selectedScheduleDate) Color.White else Muted, fontSize = 10.sp)
+                                            Text(date.dayOfMonth.toString(), color = if (date == selectedScheduleDate) Color.White else Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                            if (scheduleItems.any { it.day == date.toString() && (role == "admin" || it.employeeId == employeeId) }) Box(Modifier.padding(top = 2.dp).size(4.dp).background(if (date == selectedScheduleDate) Color.White else Blue, CircleShape)) else Spacer(Modifier.height(6.dp))
+                                        }
+                                    }
+                                }
+                            } else {
+                                val monthFirst = selectedScheduleDate.withDayOfMonth(1)
+                                val leading = monthFirst.dayOfWeek.value - 1
+                                val days = (1..monthFirst.lengthOfMonth()).map { monthFirst.withDayOfMonth(it) }
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(onClick = { selectedScheduleDate = selectedScheduleDate.minusMonths(1).withDayOfMonth(1) }) { Icon(Icons.Default.ChevronLeft, null, tint = Ink) }
+                                    Spacer(Modifier.weight(1f)); Text(monthFirst.format(DateTimeFormatter.ofPattern("yyyy年MM月")), color = Ink, fontWeight = FontWeight.Medium); Spacer(Modifier.weight(1f))
+                                    IconButton(onClick = { selectedScheduleDate = selectedScheduleDate.plusMonths(1).withDayOfMonth(1) }) { Icon(Icons.Default.ChevronRight, null, tint = Ink) }
+                                }
+                                Row(Modifier.fillMaxWidth()) { listOf("一","二","三","四","五","六","日").forEach { Text(it, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = Muted, fontSize = 10.sp) } }
+                                (0 until (leading + days.size + 6) / 7).forEach { week -> Row(Modifier.fillMaxWidth()) { (0..6).forEach { col -> val date = days.getOrNull(week * 7 + col - leading); if (date == null) Spacer(Modifier.weight(1f).height(32.dp)) else Box(Modifier.weight(1f).padding(2.dp).clip(RoundedCornerShape(6.dp)).background(if (date == selectedScheduleDate) Blue else Color.Transparent).clickable { selectedScheduleDate = date }.padding(vertical = 7.dp), contentAlignment = Alignment.Center) { Text(date.dayOfMonth.toString(), color = if (date == selectedScheduleDate) Color.White else Ink, fontSize = 11.sp) } } } }
+                            }
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) { Text(selectedScheduleDate.format(DateTimeFormatter.ofPattern("yyyy年MM月dd日")), color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text(if (role == "admin") "全员排班 · ${visibleScheduleItems.size} 条" else "我的排班 · ${visibleScheduleItems.size} 条", color = Muted, fontSize = 11.sp) }
+                        IconButton(onClick = { scope.launch { scheduleLoading = true; try { val st = R2Store(R2Config(account,bucket,access,secret,ssid)); scheduleItems = st.readSchedulesAsync(); if (role == "admin") scheduleEmployees = st.readEmployeesAsync().filter { it.enabled }; scheduleError = "" } catch(e: Exception) { scheduleError = "读取排班失败：${e.message ?: e.javaClass.simpleName}" } finally { scheduleLoading = false } } }) { Icon(Icons.Default.Refresh, "刷新排班", tint = Blue) }
+                    }
+                    if (scheduleError.isNotBlank()) Text(scheduleError, color = Color(0xFFD34B54), fontSize = 12.sp)
+                    if (scheduleLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    if (visibleScheduleItems.isEmpty() && !scheduleLoading) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("当天暂无排班", color = Muted, fontSize = 13.sp) } else LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(bottom = 8.dp)) {
+                        items(visibleScheduleItems, key = { it.id }) { item ->
+                            Card(Modifier.fillMaxWidth().then(if (role == "admin") Modifier.clickable { editingScheduleId = item.id; scheduleEmployeeId = item.employeeId; scheduleDate = item.day; scheduleSegments = item.segments; showScheduleEditor = true } else Modifier), colors = CardDefaults.cardColors(containerColor = cardBackground), shape = RoundedCornerShape(8.dp)) {
+                                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.width(if (role == "admin") 96.dp else 112.dp)) { Text(item.employeeName, color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1); Text(item.employeeId, color = Muted, fontSize = 10.sp, maxLines = 1) }
+                                    Spacer(Modifier.width(6.dp))
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) { item.segments.forEachIndexed { idx, seg -> Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("${idx + 1}.", color = Muted, fontSize = 10.sp); Text("${seg.start}–${seg.end}", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Medium) } } }
+                                    if (role == "admin") Icon(Icons.Default.Edit, "修改排班", tint = Muted, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                    Text("向上滑动返回打卡页面", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 2.dp))
+                }
+                if (showScheduleEditor && role == "admin") {
+                    AlertDialog(onDismissRequest = { showScheduleEditor = false }, title = { Text(if (editingScheduleId == null) "添加排班" else "修改排班", color = Ink) }, containerColor = cardBackground,
+                        text = { Column(Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box {
+                                OutlinedButton(onClick = { scheduleEmployeeMenu = true }, modifier = Modifier.fillMaxWidth()) { Text(scheduleEmployees.firstOrNull { it.employeeId == scheduleEmployeeId }?.let { "${it.displayName}（${it.employeeId}）" } ?: "选择员工", color = Ink) }
+                                DropdownMenu(expanded = scheduleEmployeeMenu, onDismissRequest = { scheduleEmployeeMenu = false }) { scheduleEmployees.forEach { emp -> DropdownMenuItem(text = { Text("${emp.displayName}（${emp.employeeId}）") }, onClick = { scheduleEmployeeId = emp.employeeId; scheduleEmployeeMenu = false }) } }
+                            }
+                            OutlinedTextField(value = scheduleDate, onValueChange = {}, readOnly = true, label = { Text("排班日期") }, modifier = Modifier.fillMaxWidth())
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("分段时间", color = Ink, fontWeight = FontWeight.Bold); Spacer(Modifier.weight(1f)); TextButton(onClick = { scheduleSegments = scheduleSegments + ShiftSegment() }) { Icon(Icons.Default.Add, null); Text("添加时段") } }
+                            scheduleSegments.forEachIndexed { index, seg -> var picker by remember(index) { mutableIntStateOf(0) }; var showPicker by remember(index) { mutableStateOf(false) }; Card(colors = CardDefaults.cardColors(containerColor = selectedDayBackground), shape = RoundedCornerShape(8.dp)) { Column(Modifier.fillMaxWidth().padding(6.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Text("时段 ${index + 1}", color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Medium); Spacer(Modifier.weight(1f)); if (scheduleSegments.size > 1) TextButton(onClick = { scheduleSegments = scheduleSegments.filterIndexed { i, _ -> i != index } }, contentPadding = PaddingValues(0.dp)) { Text("删除", fontSize = 11.sp) } }; Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { OutlinedButton(onClick = { picker = 1; showPicker = true }, modifier = Modifier.weight(1f)) { Text("开始 ${seg.start}", fontSize = 11.sp) }; OutlinedButton(onClick = { picker = 2; showPicker = true }, modifier = Modifier.weight(1f)) { Text("结束 ${seg.end}", fontSize = 11.sp) } } } }; if (showPicker) { val initial = runCatching { LocalTime.parse(if (picker == 1) seg.start else seg.end) }.getOrDefault(LocalTime.of(9,0)); val ts = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute, is24Hour = true); AlertDialog(onDismissRequest = { showPicker = false }, title = { Text(if (picker == 1) "选择开始时间" else "选择结束时间", color = Ink) }, containerColor = cardBackground, text = { TimePicker(state = ts) }, confirmButton = { TextButton(onClick = { val v = "%02d:%02d".format(ts.hour, ts.minute); scheduleSegments = scheduleSegments.mapIndexed { i, old -> if (i == index) if (picker == 1) old.copy(start = v) else old.copy(end = v) else old }; showPicker = false }) { Text("确定") } }, dismissButton = { TextButton(onClick = { showPicker = false }) { Text("取消") } }) } }
+                        } }, confirmButton = { Button(enabled = scheduleEmployeeId.isNotBlank() && scheduleSegments.isNotEmpty() && scheduleSegments.all { runCatching { LocalTime.parse(it.start).isBefore(LocalTime.parse(it.end)) }.getOrDefault(false) } && !scheduleLoading, onClick = { scope.launch { scheduleLoading = true; try { val emp = scheduleEmployees.firstOrNull { it.employeeId == scheduleEmployeeId } ?: error("请选择员工"); val day = LocalDate.parse(scheduleDate); val saved = ShiftSchedule(id = editingScheduleId ?: UUID.randomUUID().toString(), employeeId = emp.employeeId, employeeName = emp.displayName, day = day.toString(), segments = scheduleSegments); val updated = if (editingScheduleId == null) scheduleItems.filterNot { it.employeeId == emp.employeeId && it.day == day.toString() } + saved else scheduleItems.map { if (it.id == editingScheduleId) saved else it }; val st = R2Store(R2Config(account,bucket,access,secret,ssid)); st.writeSchedulesAsync(updated); scheduleItems = st.readSchedulesAsync(); selectedScheduleDate = day; showScheduleEditor = false; message = "排班已保存" } catch(e: Exception) { scheduleError = "保存排班失败：${e.message ?: e.javaClass.simpleName}" } finally { scheduleLoading = false } } }) { Text("保存排班") } }, dismissButton = { Row { if (editingScheduleId != null) TextButton(onClick = { scope.launch { scheduleLoading = true; try { val st = R2Store(R2Config(account,bucket,access,secret,ssid)); st.writeSchedulesAsync(scheduleItems.filterNot { it.id == editingScheduleId }); scheduleItems = st.readSchedulesAsync(); showScheduleEditor = false } catch(e: Exception) { scheduleError = "删除排班失败：${e.message ?: e.javaClass.simpleName}" } finally { scheduleLoading = false } } }) { Text("删除") }; TextButton(onClick = { showScheduleEditor = false }) { Text("取消") } } })
             } else if (showProfile) {
                 Box(Modifier.fillMaxSize().padding(padding)) {
                     if (profileBackgroundImage != null) {
@@ -1411,6 +1502,9 @@ fun WorkClockApp(context: Context) {
                 }
             } else {
                 LazyColumn(Modifier.fillMaxSize().padding(padding).pointerInput(role) {
+                    var verticalDrag = 0f
+                    detectVerticalDragGestures(onVerticalDrag = { _, amount -> verticalDrag += amount }, onDragEnd = { if (verticalDrag > 90f && loggedIn && !showProfile && !showAdminSummary) { showSchedule = true; selectedScheduleDate = LocalDate.now(AppZone); scope.launch { scheduleLoading = true; scheduleError = ""; try { val st = R2Store(R2Config(account,bucket,access,secret,ssid)); scheduleItems = st.readSchedulesAsync(); if (role == "admin") scheduleEmployees = st.readEmployeesAsync().filter { it.enabled } } catch(e: Exception) { scheduleError = "读取排班失败：${e.message ?: e.javaClass.simpleName}" } finally { scheduleLoading = false } } }; verticalDrag = 0f }, onDragCancel = { verticalDrag = 0f })
+                }.pointerInput(role) {
                     var drag = 0f
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { _, amount -> drag += amount },
@@ -1453,7 +1547,7 @@ fun WorkClockApp(context: Context) {
                     )
                 }, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     item {
-                        if (loggedIn) Text("向右滑动，进入个人空间 ✨", color = Muted, fontSize = 11.sp)
+                        if (loggedIn) Text("向右滑动进入个人空间 · 向下滑动查看排班", color = Muted, fontSize = 11.sp)
                         if (message.isNotBlank()) {
                             Card(
                                 modifier = Modifier.fillMaxWidth().clickable { hintExpanded = !hintExpanded },
