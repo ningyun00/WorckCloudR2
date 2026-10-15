@@ -915,8 +915,8 @@ fun WorkClockApp(context: Context) {
                     }
                 }
             } else if (showProfile) {
-                val profileTextColor = if (isDarkMode) Color.White else Ink
-                val profileSecondaryTextColor = if (isDarkMode) Color(0xFFCACACA) else Muted
+                val profileTextColor = Color.White
+                val profileSecondaryTextColor = Color(0xFFCACACA)
                 Box(Modifier.fillMaxSize().padding(padding)) {
                     if (profileBackgroundImage != null) {
                         Image(profileBackgroundImage!!.asImageBitmap(), "个人空间背景", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -1010,7 +1010,7 @@ fun WorkClockApp(context: Context) {
                                     Row(Modifier.fillMaxWidth().clickable { profilePersonalExpanded = !profilePersonalExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = profileTextColor)
                                         Spacer(Modifier.weight(1f))
-                                        Icon(if (profilePersonalExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profilePersonalExpanded) "收起个人资料" else "展开个人资料", tint = Muted)
+                                        Icon(if (profilePersonalExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profilePersonalExpanded) "收起个人资料" else "展开个人资料", tint = profileSecondaryTextColor)
                                     }
                                     if (profilePersonalExpanded) {
                                         OutlinedTextField(profileName, { profileName = it }, label = { Text("姓名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -1021,9 +1021,9 @@ fun WorkClockApp(context: Context) {
                                         OutlinedTextField(profileAge, { profileAge = it.filter(Char::isDigit).take(3) }, label = { Text("年龄") }, suffix = { Text("岁") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                                     }
                                     Row(Modifier.fillMaxWidth().clickable { profileContactExpanded = !profileContactExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Text("联系方式", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                        Text("联系方式", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = profileTextColor)
                                         Spacer(Modifier.weight(1f))
-                                        Icon(if (profileContactExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profileContactExpanded) "收起联系方式" else "展开联系方式", tint = Muted)
+                                        Icon(if (profileContactExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profileContactExpanded) "收起联系方式" else "展开联系方式", tint = profileSecondaryTextColor)
                                     }
                                     if (profileContactExpanded) {
                                         OutlinedTextField(profilePhone, { profilePhone = it.take(30) }, label = { Text("手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -1032,9 +1032,9 @@ fun WorkClockApp(context: Context) {
                                         OutlinedTextField(profileEmail, { profileEmail = it.take(120) }, label = { Text("邮箱") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                                     }
                                     Row(Modifier.fillMaxWidth().clickable { profileOtherExpanded = !profileOtherExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Text("其他资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                        Text("其他资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = profileTextColor)
                                         Spacer(Modifier.weight(1f))
-                                        Icon(if (profileOtherExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profileOtherExpanded) "收起其他资料" else "展开其他资料", tint = Muted)
+                                        Icon(if (profileOtherExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profileOtherExpanded) "收起其他资料" else "展开其他资料", tint = profileSecondaryTextColor)
                                     }
                                     if (profileOtherExpanded) {
                                         OutlinedTextField(profileOccupation, { profileOccupation = it.take(80) }, label = { Text("职业/岗位") }, singleLine = true, modifier = Modifier.fillMaxWidth())
