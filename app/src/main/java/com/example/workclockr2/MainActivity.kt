@@ -915,6 +915,8 @@ fun WorkClockApp(context: Context) {
                     }
                 }
             } else if (showProfile) {
+                val profileTextColor = if (isDarkMode) Color.White else Ink
+                val profileSecondaryTextColor = if (isDarkMode) Color(0xFFCACACA) else Muted
                 Box(Modifier.fillMaxSize().padding(padding)) {
                     if (profileBackgroundImage != null) {
                         Image(profileBackgroundImage!!.asImageBitmap(), "个人空间背景", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -997,8 +999,8 @@ fun WorkClockApp(context: Context) {
                                                 }
                                             }
                                         }
-                                        Text(profileName.ifBlank { employeeName }, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = if (profileBackgroundImage != null) Color.White else Ink)
-                                        Text("个人空间 · " + if (role == "admin") "管理员" else "员工", color = if (profileBackgroundImage != null) Color.White else Muted, fontSize = 13.sp)
+                                        Text(profileName.ifBlank { employeeName }, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = if (profileBackgroundImage != null) Color.White else profileTextColor)
+                                        Text("个人空间 · " + if (role == "admin") "管理员" else "员工", color = if (profileBackgroundImage != null) Color.White else profileSecondaryTextColor, fontSize = 13.sp)
                                         Text("工号：" + employeeId, color = if (profileBackgroundImage != null) Color.White else Blue, fontWeight = FontWeight.Medium)
                                     }
                                 }
@@ -1006,14 +1008,14 @@ fun WorkClockApp(context: Context) {
                             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
                                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Row(Modifier.fillMaxWidth().clickable { profilePersonalExpanded = !profilePersonalExpanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                        Text("个人资料", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = profileTextColor)
                                         Spacer(Modifier.weight(1f))
                                         Icon(if (profilePersonalExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (profilePersonalExpanded) "收起个人资料" else "展开个人资料", tint = Muted)
                                     }
                                     if (profilePersonalExpanded) {
                                         OutlinedTextField(profileName, { profileName = it }, label = { Text("姓名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Text("性别", color = Muted)
+                                            Text("性别", color = profileSecondaryTextColor)
                                             listOf("男", "女", "未设置").forEach { g -> FilterChip(selected = profileGender == g, onClick = { profileGender = g }, label = { Text(g) }) }
                                         }
                                         OutlinedTextField(profileAge, { profileAge = it.filter(Char::isDigit).take(3) }, label = { Text("年龄") }, suffix = { Text("岁") }, singleLine = true, modifier = Modifier.fillMaxWidth())
