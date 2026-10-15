@@ -1886,7 +1886,7 @@ fun WorkClockApp(context: Context) {
                                             val rawId = createId.trim()
                                             val store = R2Store(R2Config(account,bucket,access,secret,ssid))
                                             val list = store.readEmployeesAsync(); require(list.none { it.employeeId == rawId }) { "该工号已存在" }; store.writeEmployeesAsync(list + R2Store.createEmployee(rawId,createName.trim(),createRole,rawId,true,true))
-                                            message = "账号创建成功，工号：${createId.trim().padStart(6, '0')}，初始密码为该六位工号"; createId = ""; createName = ""
+                                            message = "账号创建成功，工号：$rawId，初始密码为该工号"; createId = ""; createName = ""
                                         } catch (e: Exception) { message = "创建失败：" + (e.message ?: "请检查 R2 写权限") }
                                         finally { creatingEmployee = false }
                                     }
