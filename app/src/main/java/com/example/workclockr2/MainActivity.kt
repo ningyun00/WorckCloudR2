@@ -1040,7 +1040,7 @@ fun WorkClockApp(context: Context) {
                                 }
                             }
                             if (profileMessage.isNotBlank()) Text(profileMessage, color = Blue, fontSize = 13.sp)
-                            Text("轻松工作，自信生活 ✨", color = Muted, fontSize = 12.sp)
+                            Text("轻松工作，自信生活 ✨", color = Color(0xFFD4AF37), fontSize = 12.sp)
                         }
 
                         Row(
