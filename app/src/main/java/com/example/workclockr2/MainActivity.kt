@@ -1692,7 +1692,7 @@ fun WorkClockApp(context: Context) {
                             Card(colors = CardDefaults.cardColors(containerColor = Color.Transparent), border = BorderStroke(1.dp, if (isDarkMode) Color(0xFF4A4A4A) else Color(0xFFD0D0D0)), shape = RoundedCornerShape(12.dp)) {
                                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text("时间段 ${index + 1}", fontWeight = FontWeight.Bold, color = Ink)
+                                        Text("时间段 ${makeUpSegments.size - index}", fontWeight = FontWeight.Bold, color = Ink)
                                         if (makeUpSegments.size > 1) TextButton(onClick = { makeUpSegments = makeUpSegments.filterIndexed { i, _ -> i != index } }) { Text("删除") }
                                     }
                                     var showStartTimePicker by remember(index) { mutableStateOf(false) }
