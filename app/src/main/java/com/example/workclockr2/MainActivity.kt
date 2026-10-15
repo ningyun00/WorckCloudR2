@@ -1762,7 +1762,6 @@ fun WorkClockApp(context: Context) {
                             makeUpSaving = true
                             try {
                                 val date = LocalDate.parse(makeUpDate)
-                                val store = R2Store(R2Config(account, bucket, access, secret, ssid))
                                 val additions = makeUpSegments.flatMap { segment ->
                                     val groupId = UUID.randomUUID().toString()
                                     val startAt = date.atTime(LocalTime.parse(segment.start)).atZone(AppZone).toOffsetDateTime()
