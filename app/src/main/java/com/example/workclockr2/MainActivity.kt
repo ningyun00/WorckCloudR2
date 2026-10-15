@@ -230,8 +230,12 @@ fun WorkClockApp(context: Context) {
             }
             needChangePassword -> {
                 needChangePassword = false
+                loggedIn = false
+                workerToken = ""
+                currentPasswordForChange = ""
                 newPassword = ""
                 confirmPassword = ""
+                prefs.edit().putBoolean("loggedIn", false).remove("worker_token").commit()
             }
             role == "admin" && editingMakeUpGroup != null -> editingMakeUpGroup = null
             role == "admin" && showMakeUpRecords -> showMakeUpRecords = false
