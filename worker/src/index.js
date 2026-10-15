@@ -168,7 +168,7 @@ export default {
         for (const record of body.records) {
           if (!record || typeof record.id !== "string" || !record.id || record.id.length > 128 ||
               typeof record.employeeId !== "string" || !enabledIds.has(record.employeeId) ||
-              !/^\d{4}-\d{2}-\d{2}$/.test(record.day) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\+08:00|Z)$/.test(record.at) ||
+              !/^\d{4}-\d{2}-\d{2}$/.test(record.day) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(record.at) ||
               !["IN", "OUT"].includes(record.type) || seen.has(record.id)) {
             return wrap(fail(400, "补班记录内容无效"));
           }
