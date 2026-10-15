@@ -281,7 +281,7 @@ fun WorkClockApp(context: Context) {
                 }
                 if (loggedIn && !showProfile && !showAdminSummary && selectedSummaryEmployee == null &&
                     selectedSummaryDay == null && !showMakeUpRecords && editingMakeUpGroup == null &&
-                    account.isNotBlank() && access.isNotBlank() && secret.isNotBlank()) {
+                    true) {
                     // Home priority: fetch today's punches first, then this month's records.
                     scope.launch {
                         try {
@@ -432,8 +432,7 @@ fun WorkClockApp(context: Context) {
             return
         }
         faceGatePassed = false
-        if (!configured) { showSettings = true; message = "请先完成 R2 配置"; return }
-        if (!loggedIn) { message = "请先登录"; return }
+            if (!loggedIn) { message = "请先登录"; return }
         scope.launch {
             busy = true
             message = "正在读取统一考勤配置…"
@@ -698,7 +697,7 @@ fun WorkClockApp(context: Context) {
                 IconButton(onClick = { if (role == "admin" && loggedIn) { configUnlocked = false; showAdminConfigAuth = false; adminConfigPassword = ""; configAuthMessage = "" }; showSettings = true }) { Icon(Icons.Default.Settings, "设置") }
             }, colors = TopAppBarDefaults.topAppBarColors(containerColor = pageBackground))
         }, bottomBar = {
-            if (loggedIn && !needChangePassword && !showAdminSummary && configured) {
+            if (loggedIn && !needChangePassword && !showAdminSummary) {
                 Surface(shadowElevation = 8.dp, color = cardBackground) {
                     OutlinedButton(
                         onClick = {
@@ -727,16 +726,7 @@ fun WorkClockApp(context: Context) {
                 }
             }
         }) { padding ->
-            if (!configured) {
-                Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center) {
-                    Icon(Icons.Default.CloudOff, null, tint = Blue, modifier = Modifier.size(52.dp))
-                    Spacer(Modifier.height(12.dp))
-                    Text("首次使用，请配置 Cloudflare R2", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Ink)
-                    Text("未完成配置前，登录和打卡功能均不可用。", color = Muted)
-                    Spacer(Modifier.height(20.dp))
-                    Button(onClick = { showSettings = true }, modifier = Modifier.fillMaxWidth()) { Text("配置 R2") }
-                }
-            } else if (!loggedIn) {
+            if (!loggedIn) {
                 Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center) {
                     Text("欢迎回来", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Ink)
                     Text("请使用管理员分配的工号登录", color = Muted)
