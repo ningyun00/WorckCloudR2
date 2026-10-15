@@ -1610,19 +1610,17 @@ fun WorkClockApp(context: Context) {
                                 } else {
                                     val homePunchDetails = buildList {
                                         val ordered = dayPunches.sortedBy { it.at }
-                                        val tempIndex = ordered.indexOfLast { it.type == "TEMP_OUT" }
-                                        ordered.firstOrNull { it.type == "IN" }?.let { add(it) }
+                                        val tempIndex = ordered.indexOfLast { punch -> punch.type == "TEMP_OUT" }
+                                        ordered.firstOrNull { punch -> punch.type == "IN" }?.let { punch -> add(punch) }
                                         if (tempIndex >= 0) {
-                                            ordered.take(tempIndex).lastOrNull { it.type == "OUT" }?.let { add(it) }
+                                            ordered.take(tempIndex).lastOrNull { punch -> punch.type == "OUT" }?.let { punch -> add(punch) }
                                             add(ordered[tempIndex])
-                                            ordered.drop(tempIndex + 1).firstOrNull { it.type == "IN" }?.let { nextIn ->
-                                                if (none { it.id == nextIn.id }) add(nextIn)
-                                            }
+                                            ordered.drop(tempIndex + 1).firstOrNull { punch -> punch.type == "IN" }?.let { punch -> add(punch) }
                                         }
-                                        ordered.lastOrNull { it.type == "OUT" }?.let { lastOut ->
-                                            if (none { it.id == lastOut.id }) add(lastOut)
+                                        ordered.lastOrNull { punch -> punch.type == "OUT" }?.let { punch ->
+                                            if (none { existing -> existing.id == punch.id }) add(punch)
                                         }
-                                    }.sortedBy { it.at }
+                                    }.sortedByDescending { punch -> punch.at }
                                     LazyColumn(
                                         modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
                                         verticalArrangement = Arrangement.spacedBy(0.dp)
