@@ -865,7 +865,7 @@ fun WorkClockApp(context: Context) {
                                         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Text(when (punch.type) { "IN" -> "上班打卡"; "OUT" -> "下班打卡"; else -> "临时下班" },
                                                 color = Ink, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                                            Text(punch.at.replace("T", " ").take(19), color = Muted, fontSize = 13.sp)
+                                            Text(formatAppDateTime(punch.at, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")), color = Muted, fontSize = 13.sp)
                                         }
                                     }
                                 }
@@ -1273,7 +1273,7 @@ fun WorkClockApp(context: Context) {
                                     val isStart = showEditStartPicker
                                     val initial = LocalTime.parse(if (isStart) editingMakeUpStart else editingMakeUpEnd)
                                     val state = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute, is24Hour = true)
-                                    AlertDialog(onDismissRequest = { showEditStartPicker = false; showEditEndPicker = false }, title = { Text(if (isStart) "选择开始时间" else "选择结束时间") }, text = { TimePicker(state = state) }, confirmButton = { TextButton(onClick = { val value = "%02d:%02d".format(state.hour, state.minute); if (isStart) editingMakeUpStart = value else editingMakeUpEnd = value; showEditStartPicker = false; showEditEndPicker = false }) { Text("确定") } }, dismissButton = { TextButton(onClick = { showEditStartPicker = false; showEditEndPicker = false }) { Text("取消") } })
+                                    AlertDialog(onDismissRequest = { showEditStartPicker = false; showEditEndPicker = false }, title = { Text(if (isStart) "选择开始时间" else "选择结束时间") }, text = { TimePicker(state = state, colors = TimePickerDefaults.colors(clockDialColor = selectedDayBackground, selectorColor = Blue, containerColor = cardBackground, periodSelectorBorderColor = Muted, timeSelectorSelectedContainerColor = Blue, timeSelectorUnselectedContainerColor = selectedDayBackground, timeSelectorSelectedContentColor = Color.White, timeSelectorUnselectedContentColor = Ink)) }, confirmButton = { TextButton(onClick = { val value = "%02d:%02d".format(state.hour, state.minute); if (isStart) editingMakeUpStart = value else editingMakeUpEnd = value; showEditStartPicker = false; showEditEndPicker = false }) { Text("确定") } }, dismissButton = { TextButton(onClick = { showEditStartPicker = false; showEditEndPicker = false }) { Text("取消") } })
                                 }
                             }
                         },
@@ -1615,7 +1615,7 @@ fun WorkClockApp(context: Context) {
                                                 Spacer(Modifier.width(10.dp))
                                                 Column(Modifier.weight(1f)) {
                                                     Text(when(p.type) { "IN" -> "上班打卡"; "OUT" -> "下班打卡"; else -> "临时下班" }, color = Ink, fontWeight = FontWeight.Medium)
-                                                    Text(p.at.replace("T", " ").take(19), color = Muted, fontSize = 12.sp)
+                                                    Text(formatAppDateTime(p.at, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")), color = Muted, fontSize = 12.sp)
                                                 }
                                                 Text(when(p.type) { "IN" -> "开始"; "OUT" -> "结束"; else -> "结算区间" }, color = Muted, fontSize = 12.sp)
                                             }
