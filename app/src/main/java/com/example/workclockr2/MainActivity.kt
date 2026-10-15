@@ -137,6 +137,7 @@ fun WorkClockApp(context: Context) {
     var creatingEmployee by remember { mutableStateOf(false) }
     var loginId by remember { mutableStateOf("") }
     var loginPassword by remember { mutableStateOf("") }
+    var currentPasswordForChange by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var needChangePassword by remember { mutableStateOf(false) }
@@ -750,6 +751,7 @@ fun WorkClockApp(context: Context) {
                                 role = session.role
                                 loggedIn = true
                                 needChangePassword = session.mustChangePassword
+                                currentPasswordForChange = loginPassword
                                 prefs.edit().putString("worker_token", workerToken).putString("employee", employeeId)
                                     .putString("name", employeeName).putString("role", role).putBoolean("loggedIn", true).commit()
                                 try {
@@ -782,15 +784,17 @@ fun WorkClockApp(context: Context) {
                     Text("设置新密码", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Ink)
                     Text("首次登录请修改密码。", color = Muted)
                     Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(currentPasswordForChange, { currentPasswordForChange = it }, label = { Text("当前密码") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     OutlinedTextField(newPassword, { newPassword = it }, label = { Text("新密码（至少 6 位）") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     OutlinedTextField(confirmPassword, { confirmPassword = it }, label = { Text("确认新密码") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    Button(enabled = !busy && newPassword.length >= 6 && newPassword == confirmPassword, onClick = {
+                    Button(enabled = !busy && currentPasswordForChange.isNotBlank() && newPassword.length >= 6 && newPassword == confirmPassword, onClick = {
                         scope.launch {
                             busy = true
                             try {
                                 if (workerToken.isBlank()) error("登录状态已失效，请重新登录")
-                                attendanceApi.changePassword(workerToken, loginPassword, newPassword)
+                                attendanceApi.changePassword(workerToken, currentPasswordForChange, newPassword)
                                 loginPassword = newPassword
+                                currentPasswordForChange = newPassword
                                 needChangePassword = false; newPassword = ""; confirmPassword = ""; message = "密码已通过考勤服务更新"
                             } catch (e: Exception) { message = "修改失败：" + (e.message ?: "请检查 R2 权限") }
                             finally { busy = false }
