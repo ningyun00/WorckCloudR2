@@ -122,6 +122,22 @@ export default {
         return wrap(json({ allowedSsid: cfg && typeof cfg.allowedSsid === "string" ? cfg.allowedSsid : "" }));
       }
       if (request.method === "GET" && url.pathname === "/api/attendance") {
+        const month = url.searchParams.get("month");
+        if (month !== null) {
+          if (!/^\\d{4}-\\d{2}$/.test(month) || !Number.isFinite(Date.parse(month + "-01T00:00:00Z"))) return wrap(fail(400, "月份格式无效"));
+          const legacy = await readJsonObject(env.ATTENDANCE_BUCKET, "attendance/" + month + ".json");
+          const records = Array.isArray(legacy) ? legacy : [];
+          const year = Number(month.slice(0, 4)), mon = Number(month.slice(5, 7));
+          const daysInMonth = new Date(Date.UTC(year, mon, 0)).getUTCDate();
+          const dailyRecords = [];
+          for (let d = 1; d <= daysInMonth; d++) {
+            const day = month + "-" + String(d).padStart(2, "0");
+            const daily = await readJsonObject(env.ATTENDANCE_BUCKET, dayKey(day));
+            if (Array.isArray(daily)) dailyRecords.push(...daily);
+          }
+          const all = dailyRecords.length ? dailyRecords : records;
+          return wrap(json(all.filter(x => x && x.employeeId === session.employeeId && x.day.startsWith(month))));
+        }
         const day = url.searchParams.get("day") || chinaDateParts().day;
         if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(day) || !Number.isFinite(Date.parse(day + "T00:00:00Z"))) return wrap(fail(400, "日期格式无效"));
         const daily = await readJsonObject(env.ATTENDANCE_BUCKET, dayKey(day));
@@ -141,7 +157,7 @@ export default {
         const saved = await lock.fetch("https://lock.internal/append", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(record) });
         const result = await saved.json().catch(() => null);
         if (!saved.ok) return wrap(fail(500, "打卡保存失败，请稍后重试"));
-        return wrap(json({ record, records: result.records }));
+        return wrap(json({ record }));
       }
       if (request.method === "POST" && url.pathname === "/api/password") {
         const body = await request.json().catch(() => null);
