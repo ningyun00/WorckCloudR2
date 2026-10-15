@@ -256,7 +256,9 @@ fun WorkClockApp(context: Context) {
                 val savedEmployee = prefs.getString("employee", "") ?: ""
                 val savedName = prefs.getString("name", "员工") ?: "员工"
                 val savedRole = prefs.getString("role", "") ?: ""
-                val savedLoggedIn = prefs.getBoolean("loggedIn", false)
+                val savedToken = prefs.getString("worker_token", "") ?: ""
+                val savedLoggedIn = prefs.getBoolean("loggedIn", false) && savedToken.isNotBlank()
+                workerToken = savedToken
                 if (savedAccount.isNotBlank() && savedAccess.isNotBlank() && savedSecret.isNotBlank()) {
                     account = savedAccount
                     access = savedAccess
@@ -279,14 +281,19 @@ fun WorkClockApp(context: Context) {
                     scope.launch {
                         try {
                             val currentMonth = LocalDate.now(AppZone).format(DateTimeFormatter.ofPattern("yyyy-MM"))
-                            val store = R2Store(R2Config(account, bucket, access, secret, ssid))
+                            if (workerToken.isBlank()) {
+                                loggedIn = false
+                                prefs.edit().putBoolean("loggedIn", false).remove("worker_token").commit()
+                                message = "登录状态已失效，请重新登录。"
+                                return@launch
+                            }
                             val todayKey = LocalDate.now(AppZone).toString()
-                            val todays = store.readPunchesForDayAsync(todayKey).filter { it.employeeId == employeeId }
+                            val todays = attendanceApi.punchesForDay(workerToken, todayKey)
                             punchList = todays
                             val lastTemp = todays.indexOfLast { it.type == "TEMP_OUT" }
                             status = if (todays.drop(lastTemp + 1).any { it.type == "IN" }) "已上班" else if (todays.isNotEmpty()) "已打卡" else "尚未打卡"
                             try {
-                                val monthRows = store.readPunchesAsync(currentMonth).filter { it.employeeId == employeeId }
+                                val monthRows = attendanceApi.punchesForMonth(workerToken, currentMonth)
                                 punchList = (monthRows.filterNot { it.day == todayKey } + todays).distinctBy { it.id }
                             } catch (e: Exception) {
                                 Log.e("WorkClockRefresh", "后台加载月度考勤失败", e)
@@ -701,7 +708,8 @@ fun WorkClockApp(context: Context) {
                             configUnlocked = false
                             showAdminConfigAuth = false
                             adminConfigPassword = ""
-                            prefs.edit().putBoolean("loggedIn", false).commit()
+                            prefs.edit().putBoolean("loggedIn", false).remove("worker_token").commit()
+                            workerToken = ""
                             punchList = emptyList()
                             message = "已退出登录"
                         },
@@ -788,7 +796,7 @@ fun WorkClockApp(context: Context) {
                             finally { busy = false }
                         }
                     }, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "保存中…" else "保存新密码") }
-                    TextButton(onClick = { loggedIn = false; showProfile = false; profileAvatar = null; profileBackgroundImage = null; profileGender = "未设置"; profileAge = ""; profileName = "员工"; profileMessage = ""; configUnlocked = false; prefs.edit().putBoolean("loggedIn", false).commit() }) { Text("退出登录") }
+                    TextButton(onClick = { loggedIn = false; showProfile = false; profileAvatar = null; profileBackgroundImage = null; profileGender = "未设置"; profileAge = ""; profileName = "员工"; profileMessage = ""; configUnlocked = false; prefs.edit().putBoolean("loggedIn", false).remove("worker_token").commit(); workerToken = "" }) { Text("退出登录") }
                 }
             } else if (selectedSummaryEmployee != null && role == "admin") {
                 val emp = selectedSummaryEmployee!!
