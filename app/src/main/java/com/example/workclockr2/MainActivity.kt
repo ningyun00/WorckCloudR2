@@ -280,8 +280,7 @@ fun WorkClockApp(context: Context) {
                     loggedIn = false
                 }
                 if (loggedIn && !showProfile && !showAdminSummary && selectedSummaryEmployee == null &&
-                    selectedSummaryDay == null && !showMakeUpRecords && editingMakeUpGroup == null &&
-                    true) {
+                    selectedSummaryDay == null && !showMakeUpRecords && editingMakeUpGroup == null) {
                     // Home priority: fetch today's punches first, then this month's records.
                     scope.launch {
                         try {
