@@ -1,3 +1,5 @@
+import { readJsonObject, employees } from "./storage/json.js";
+
 const encoder = new TextEncoder();
 const TOKEN_TTL_SECONDS = 8 * 60 * 60;
 
@@ -55,23 +57,14 @@ async function readToken(request, secret) {
     return { employeeId: String(p.sub), role: String(p.role || "") };
   } catch { return null; }
 }
-async function readJsonObject(bucket, key) {
-  const obj = await bucket.get(key);
-  if (!obj) return null;
-  return JSON.parse(await obj.text());
-}
-async function employees(bucket) {
-  const data = await readJsonObject(bucket, "employees.json");
-  if (!data || typeof data !== "object") throw new Error("employee store unavailable");
-  return [...(Array.isArray(data.employees) ? data.employees : []), ...(Array.isArray(data.ListUsers) ? data.ListUsers : [])];
-}
 async function verifyPassword(employee, password) {
   try {
     const salt = unb64(employee.passwordSalt);
     const expected = unb64(employee.passwordHash);
-    const combined = new Uint8Array(salt.length + encoder.encode(password).length);
+    const encodedPassword = encoder.encode(password);
+    const combined = new Uint8Array(salt.length + encodedPassword.length);
     combined.set(salt);
-    combined.set(encoder.encode(password), salt.length);
+    combined.set(encodedPassword, salt.length);
     const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", combined));
     if (digest.length !== expected.length) return false;
     let diff = 0;
@@ -124,27 +117,26 @@ export default {
       if (request.method === "GET" && url.pathname === "/api/attendance") {
         const month = url.searchParams.get("month");
         if (month !== null) {
-          if (!/^\d{4}-\d{2}$/.test(month) || !Number.isFinite(Date.parse(month + "-01T00:00:00Z"))) return wrap(fail(400, "月份格式无效"));
+          if (!/^\\d{4}-\\d{2}$/.test(month) || !Number.isFinite(Date.parse(month + "-01T00:00:00Z"))) return wrap(fail(400, "月份格式无效"));
           const legacy = await readJsonObject(env.ATTENDANCE_BUCKET, "attendance/" + month + ".json");
           const records = Array.isArray(legacy) ? legacy : [];
           const year = Number(month.slice(0, 4)), mon = Number(month.slice(5, 7));
           const daysInMonth = new Date(Date.UTC(year, mon, 0)).getUTCDate();
-          const dailyRecords = [];
-          for (let d = 1; d <= daysInMonth; d++) {
-            const day = month + "-" + String(d).padStart(2, "0");
-            const daily = await readJsonObject(env.ATTENDANCE_BUCKET, dayKey(day));
-            if (Array.isArray(daily)) dailyRecords.push(...daily);
-          }
+          const dailyGroups = await Promise.all(Array.from({ length: daysInMonth }, (_, index) => {
+            const day = month + "-" + String(index + 1).padStart(2, "0");
+            return readJsonObject(env.ATTENDANCE_BUCKET, dayKey(day));
+          }));
+          const dailyRecords = dailyGroups.filter(Array.isArray).flat();
           const all = dailyRecords.length ? dailyRecords : records;
-          return wrap(json({ records: all.filter(x => x && x.employeeId === session.employeeId && x.day.startsWith(month)) }));
+          return wrap(json({ records: all.filter(x => x && x.employeeId === session.employeeId && typeof x.day === "string" && x.day.startsWith(month)) }));
         }
         const day = url.searchParams.get("day") || chinaDateParts().day;
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(Date.parse(day + "T00:00:00Z"))) return wrap(fail(400, "日期格式无效"));
+        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(day) || !Number.isFinite(Date.parse(day + "T00:00:00Z"))) return wrap(fail(400, "日期格式无效"));
         const daily = await readJsonObject(env.ATTENDANCE_BUCKET, dayKey(day));
         let records = Array.isArray(daily) ? daily : null;
         if (!records) {
           const legacy = await readJsonObject(env.ATTENDANCE_BUCKET, "attendance/" + day.slice(0, 7) + ".json");
-          records = Array.isArray(legacy) ? legacy.filter(x => x.day === day) : [];
+          records = Array.isArray(legacy) ? legacy.filter(x => x && x.day === day) : [];
         }
         return wrap(json({ records: records.filter(x => x && x.employeeId === session.employeeId) }));
       }
@@ -168,7 +160,7 @@ export default {
         for (const record of body.records) {
           if (!record || typeof record.id !== "string" || !record.id || record.id.length > 128 ||
               typeof record.employeeId !== "string" || !enabledIds.has(record.employeeId) ||
-              !/^\d{4}-\d{2}-\d{2}$/.test(record.day) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(record.at) ||
+              !/^\\d{4}-\\d{2}-\\d{2}$/.test(record.day) || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$/.test(record.at) ||
               !["IN", "OUT"].includes(record.type) || seen.has(record.id)) {
             return wrap(fail(400, "补班记录内容无效"));
           }
