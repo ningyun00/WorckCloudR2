@@ -116,7 +116,6 @@ class AttendanceApi {
         return array.toPunchList()
     }
 
-    private fun parsePunches(array: JSONArray): List<Punch> = array.toPunchList()
 
     private fun JSONArray.toPunchList(): List<Punch> = buildList {
         for (index in 0 until length()) {
