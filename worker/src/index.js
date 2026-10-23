@@ -118,16 +118,21 @@ export default {
         const month = url.searchParams.get("month");
         if (month !== null) {
           if (!/^\d{4}-\d{2}$/.test(month) || !Number.isFinite(Date.parse(month + "-01T00:00:00Z"))) return wrap(fail(400, "月份格式无效"));
-          const legacy = await readJsonObject(env.ATTENDANCE_BUCKET, "attendance/" + month + ".json");
-          const records = Array.isArray(legacy) ? legacy : [];
           const year = Number(month.slice(0, 4)), mon = Number(month.slice(5, 7));
           const daysInMonth = new Date(Date.UTC(year, mon, 0)).getUTCDate();
-          const dailyGroups = await Promise.all(Array.from({ length: daysInMonth }, (_, index) => {
-            const day = month + "-" + String(index + 1).padStart(2, "0");
-            return readJsonObject(env.ATTENDANCE_BUCKET, dayKey(day));
-          }));
+          const [legacy, dailyGroups] = await Promise.all([
+            readJsonObject(env.ATTENDANCE_BUCKET, "attendance/" + month + ".json"),
+            Promise.all(Array.from({ length: daysInMonth }, (_, index) => {
+              const day = month + "-" + String(index + 1).padStart(2, "0");
+              return readJsonObject(env.ATTENDANCE_BUCKET, dayKey(day));
+            }))
+          ]);
           const dailyRecords = dailyGroups.filter(Array.isArray).flat();
-          const all = dailyRecords.length ? dailyRecords : records;
+          const dailyFiles = new Set(dailyGroups.flatMap((value, index) => value !== null
+            ? [month + "-" + String(index + 1).padStart(2, "0")] : []));
+          const legacyRecords = Array.isArray(legacy) ? legacy.filter(x =>
+            x && typeof x.day === "string" && !dailyFiles.has(x.day)) : [];
+          const all = [...dailyRecords, ...legacyRecords];
           return wrap(json({ records: all.filter(x => x && x.employeeId === session.employeeId && typeof x.day === "string" && x.day.startsWith(month)) }));
         }
         const day = url.searchParams.get("day") || chinaDateParts().day;
