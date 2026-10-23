@@ -34,20 +34,16 @@ class R2Store(private val config: R2Config) {
         val days = (1..yearMonth.lengthOfMonth()).map { yearMonth.atDay(it).toString() }
         val dailyResults = days.mapConcurrent(limit = 6) { day ->
             val key = "attendance/$month/$day.json"
-            readText(key)?.let { parsePunches(key, it) }.orEmpty()
+            val raw = readText(key)
+            day to (raw != null) to (raw?.let { parsePunches(key, it) }.orEmpty())
         }
-        val daily = dailyResults.flatten()
-        if (daily.isNotEmpty()) return daily.distinctBy { it.id }
-
+        val existingDailyDays = dailyResults.filter { it.first.first.second }.map { it.first.first.first }.toSet()
+        val daily = dailyResults.flatMap { it.second }
         val legacyKey = "attendance/$month.json"
-        val legacyRaw = readText(legacyKey) ?: return emptyList()
-        val legacy = parsePunches(legacyKey, legacyRaw)
-        legacy.groupBy { it.day }.forEach { (date, records) ->
-            if (date.startsWith("$month-") && runCatching { java.time.LocalDate.parse(date) }.isSuccess) {
-                writeText("attendance/$month/$date.json", gson.toJson(records))
-            }
-        }
-        return legacy.distinctBy { it.id }
+        val legacyRaw = readText(legacyKey)
+        val legacy = legacyRaw?.let { parsePunches(legacyKey, it) }.orEmpty()
+        val fallback = legacy.filter { it.day !in existingDailyDays }
+        return (daily + fallback).distinctBy { it.id }
     }
     suspend fun readPunchesForDayAsync(day: String): List<Punch> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val date = java.time.LocalDate.parse(day)
