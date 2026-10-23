@@ -20,7 +20,7 @@ data class AttendanceSession(
 data class WorkerPunchResult(val record: Punch)
 
 class AttendanceApi {
-    private val baseUrl = "https://cs.sixiaojie.dpdns.org"
+    private val baseUrl = "https://hlcs.sixiaojie.dpdns.org"
 
     suspend fun login(employeeId: String, password: String): AttendanceSession = withContext(Dispatchers.IO) {
         val result = request("POST", "/api/session", body = JSONObject()
