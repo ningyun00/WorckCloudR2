@@ -54,9 +54,6 @@ import java.util.UUID
 private val Blue = Color(0xFF1769E0)
 private val Ink = Color(0xFF142238)
 private val Muted = Color(0xFF758198)
-private val AppZone = ZoneOffset.ofHours(8)
-private val DisplayTime = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
-private fun formatAppDateTime(value: String, pattern: DateTimeFormatter): String = runCatching { ZonedDateTime.parse(value).withZoneSameInstant(AppZone).format(pattern) }.recoverCatching { LocalDateTime.parse(value).format(pattern) }.getOrDefault(value.replace("T", " ").take(23))
 
 
 class MainActivity : ComponentActivity() {
