@@ -35,10 +35,10 @@ class R2Store(private val config: R2Config) {
         val dailyResults = days.mapConcurrent(limit = 6) { day ->
             val key = "attendance/$month/$day.json"
             val raw = readText(key)
-            day to (raw != null) to (raw?.let { parsePunches(key, it) }.orEmpty())
+            Triple(day, raw != null, raw?.let { parsePunches(key, it) }.orEmpty())
         }
-        val existingDailyDays = dailyResults.filter { it.first.first.second }.map { it.first.first.first }.toSet()
-        val daily = dailyResults.flatMap { it.second }
+        val existingDailyDays = dailyResults.filter { it.second }.map { it.first }.toSet()
+        val daily = dailyResults.flatMap { it.third }
         val legacyKey = "attendance/$month.json"
         val legacyRaw = readText(legacyKey)
         val legacy = legacyRaw?.let { parsePunches(legacyKey, it) }.orEmpty()
