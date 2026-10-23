@@ -1,0 +1,33 @@
+CREATE DATABASE IF NOT EXISTS hlsxcs CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE hlsxcs;
+
+CREATE TABLE IF NOT EXISTS employees (
+  employee_id VARCHAR(64) NOT NULL PRIMARY KEY,
+  display_name VARCHAR(100) NOT NULL DEFAULT '',
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  must_change_password TINYINT(1) NOT NULL DEFAULT 0,
+  password_hash VARCHAR(128) NOT NULL,
+  password_salt VARCHAR(128) NOT NULL,
+  role VARCHAR(32) NOT NULL DEFAULT 'employee',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS app_config (
+  config_key VARCHAR(100) NOT NULL PRIMARY KEY,
+  config_value TEXT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS attendance_records (
+  id VARCHAR(128) NOT NULL PRIMARY KEY,
+  employee_id VARCHAR(64) NOT NULL,
+  punch_type ENUM('IN','OUT','TEMP_OUT') NOT NULL,
+  punch_day DATE NOT NULL,
+  punched_at DATETIME NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_attendance_employee_day (employee_id, punch_day),
+  INDEX idx_attendance_punched_at (punched_at),
+  CONSTRAINT fk_attendance_employee FOREIGN KEY (employee_id) REFERENCES employees(employee_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB;
