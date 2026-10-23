@@ -20,7 +20,35 @@ class R2Store(private val config: R2Config) {
     // UI code should use these functions instead of calling the synchronous S3 helpers directly.
     suspend fun testConnectionAsync(): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { testConnection() }
     suspend fun readEmployeesAsync(): List<Employee> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readEmployees() }
-    suspend fun readPunchesAsync(month: String): List<Punch> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readPunches(month) }
+    suspend fun readPunchesAsync(month: String): List<Punch> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readPunchesOptimized(month) }
+
+    /**
+     * Reads daily attendance objects concurrently with a bounded request count.
+     * Legacy monthly JSON remains supported and is migrated using the existing format.
+     */
+    private suspend fun readPunchesOptimized(month: String): List<Punch> {
+        val yearMonth = try { java.time.YearMonth.parse(month) } catch (e: Exception) {
+            throw IllegalArgumentException("月份格式应为 yyyy-MM：$month", e)
+        }
+        val days = (1..yearMonth.lengthOfMonth()).map { yearMonth.atDay(it).toString() }
+        val dailyResults = days.mapConcurrent(limit = 6) { day ->
+            val key = "attendance/$month/$day.json"
+            readText(key)?.let { parsePunches(key, it) }.orEmpty()
+        }
+        val daily = dailyResults.flatten()
+        if (daily.isNotEmpty()) return daily.distinctBy { it.id }
+
+        val legacyKey = "attendance/$month.json"
+        val legacyRaw = readText(legacyKey) ?: return emptyList()
+        val legacy = parsePunches(legacyKey, legacyRaw)
+        legacy.groupBy { it.day }.forEach { (date, records) ->
+            if (date.startsWith("$month-") && runCatching { java.time.LocalDate.parse(date) }.isSuccess) {
+                writeText("attendance/$month/$date.json", gson.toJson(records))
+            }
+        }
+        return legacy.distinctBy { it.id }
+    }
     suspend fun readPunchesForDayAsync(day: String): List<Punch> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val date = java.time.LocalDate.parse(day)
         val month = date.toString().take(7)
