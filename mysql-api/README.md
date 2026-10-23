@@ -1,6 +1,6 @@
 # WorkClockR2 MySQL API
 
-This API implements the Android app's existing contract and uses the local MySQL database.
+This API preserves the Android app's existing request/response contract while replacing the backend implementation with a validated, transaction-safe MySQL service. Android UI changes are intentionally out of scope for this backend refactor.
 
 ## Local setup
 1. Copy this folder to `C:\\WorckCloudR2-MySQL` (or use the existing folder).
@@ -20,3 +20,24 @@ This API implements the Android app's existing contract and uses the local MySQL
 - `POST /api/password`
 
 Employee password hashes use the existing Worker format: SHA-256(Base64-decoded salt bytes + UTF-8 password), with Base64 salt/hash fields. Times are stored as local China time in MySQL and returned in the app's expected string format. Make-up records are validated and written in one SQL transaction.
+
+## Compatibility and safety
+- Existing routes and response fields are preserved so the current Android client can keep working without a UI rewrite.
+- Employee password hashes remain compatible with the existing Worker format: SHA-256(Base64-decoded salt bytes + UTF-8 password), with Base64 salt/hash fields.
+- Session tokens expire after 8 hours; protected requests re-check that the employee exists and remains enabled.
+- Admin role matching is case-insensitive (admin / ADMIN).
+- Login attempts are rate-limited per source IP; JSON bodies are size-limited.
+- Calendar dates and make-up timestamps are validated, including real calendar dates and matching day/at values.
+- Make-up entries are written in one SQL transaction; duplicates or invalid employee references fail without partially saving the batch.
+- Times remain China-local (Asia/Shanghai) and retain the app's existing string format.
+- Health checks verify connectivity and the expected tables. They do not prove employee login or every attendance workflow works.
+
+## Current API contract
+- POST /api/session accepts employeeId and password; success returns token and employee.
+- GET /api/config returns allowedSsid.
+- GET /api/attendance?day=YYYY-MM-DD and GET /api/attendance?month=YYYY-MM return records.
+- POST /api/attendance accepts id and type (IN, OUT, TEMP_OUT).
+- POST /api/admin/attendance/makeup accepts records and is admin-only.
+- POST /api/password accepts currentPassword and newPassword.
+
+Errors keep the existing error field; selected validation and authorization errors also include a stable code field.
