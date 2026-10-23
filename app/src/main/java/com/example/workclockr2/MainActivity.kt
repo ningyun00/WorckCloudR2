@@ -58,12 +58,6 @@ private val AppZone = ZoneOffset.ofHours(8)
 private val DisplayTime = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
 private fun formatAppDateTime(value: String, pattern: DateTimeFormatter): String = runCatching { ZonedDateTime.parse(value).withZoneSameInstant(AppZone).format(pattern) }.recoverCatching { LocalDateTime.parse(value).format(pattern) }.getOrDefault(value.replace("T", " ").take(23))
 
-data class R2Config(val accountId: String, val bucket: String, val accessKey: String, val secretKey: String, val allowedSsid: String)
-data class Punch(val id: String = UUID.randomUUID().toString(), val employeeId: String, val at: String, val type: String, val day: String)
-data class MakeUpSegment(val start: String = "09:00", val end: String = "18:00")
-data class Employee(val employeeId: String, val displayName: String, val role: String, val passwordSalt: String, val passwordHash: String, val mustChangePassword: Boolean, val enabled: Boolean)
-
-data class ProfileData(val employeeId: String, val name: String, val gender: String, val age: String, val avatarKey: String, val background: Int, val phone: String = "", val wechat: String = "", val qq: String = "", val email: String = "", val address: String = "", val emergencyContact: String = "", val emergencyPhone: String = "", val occupation: String = "", val bio: String = "")
 
 class MainActivity : ComponentActivity() {
     private val requestPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
