@@ -25,7 +25,7 @@ class R2Store(private val config: R2Config) {
 
     /**
      * Reads daily attendance objects concurrently with a bounded request count.
-     * Legacy monthly JSON remains supported and is migrated using the existing format.
+     * Legacy monthly JSON remains a fallback for dates whose daily object is missing.
      */
     private suspend fun readPunchesOptimized(month: String): List<Punch> {
         val yearMonth = try { java.time.YearMonth.parse(month) } catch (e: Exception) {
