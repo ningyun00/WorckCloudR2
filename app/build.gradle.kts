@@ -12,6 +12,7 @@ android {
         targetSdk = 35
         versionCode = 14
         versionName = "0.2.4"
+        // Build requested for direct login testing against the MySQL API.
     }
     buildFeatures { compose = true }
     compileOptions {
