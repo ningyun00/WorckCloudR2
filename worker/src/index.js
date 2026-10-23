@@ -117,7 +117,7 @@ export default {
       if (request.method === "GET" && url.pathname === "/api/attendance") {
         const month = url.searchParams.get("month");
         if (month !== null) {
-          if (!/^\\d{4}-\\d{2}$/.test(month) || !Number.isFinite(Date.parse(month + "-01T00:00:00Z"))) return wrap(fail(400, "月份格式无效"));
+          if (!/^\d{4}-\d{2}$/.test(month) || !Number.isFinite(Date.parse(month + "-01T00:00:00Z"))) return wrap(fail(400, "月份格式无效"));
           const legacy = await readJsonObject(env.ATTENDANCE_BUCKET, "attendance/" + month + ".json");
           const records = Array.isArray(legacy) ? legacy : [];
           const year = Number(month.slice(0, 4)), mon = Number(month.slice(5, 7));
@@ -131,7 +131,7 @@ export default {
           return wrap(json({ records: all.filter(x => x && x.employeeId === session.employeeId && typeof x.day === "string" && x.day.startsWith(month)) }));
         }
         const day = url.searchParams.get("day") || chinaDateParts().day;
-        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(day) || !Number.isFinite(Date.parse(day + "T00:00:00Z"))) return wrap(fail(400, "日期格式无效"));
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(Date.parse(day + "T00:00:00Z"))) return wrap(fail(400, "日期格式无效"));
         const daily = await readJsonObject(env.ATTENDANCE_BUCKET, dayKey(day));
         let records = Array.isArray(daily) ? daily : null;
         if (!records) {
@@ -160,7 +160,7 @@ export default {
         for (const record of body.records) {
           if (!record || typeof record.id !== "string" || !record.id || record.id.length > 128 ||
               typeof record.employeeId !== "string" || !enabledIds.has(record.employeeId) ||
-              !/^\\d{4}-\\d{2}-\\d{2}$/.test(record.day) || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$/.test(record.at) ||
+              !/^\d{4}-\d{2}-\d{2}$/.test(record.day) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(record.at) ||
               !["IN", "OUT"].includes(record.type) || seen.has(record.id)) {
             return wrap(fail(400, "补班记录内容无效"));
           }
