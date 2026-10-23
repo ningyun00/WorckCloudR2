@@ -44,9 +44,9 @@ const isRealDateTime = value => {
 const normalizeRole = role => String(role || "").trim().toLowerCase();
 const loginAttempts = new Map();
 const loginRateLimit = (req, res, next) => {
-  const key = req.ip || req.socket.remoteAddress || "unknown";
+  const key = req.get("CF-Connecting-IP") || req.ip || req.socket.remoteAddress || "unknown";
   const now = Date.now();
-  const current = loginAttempts.get(key);
+  const current = loginAttempts.get(key);\n  if (loginAttempts.size > 5000) { for (const [ip, entry] of loginAttempts) if (now - entry.startedAt > 10 * 60 * 1000) loginAttempts.delete(ip); }
   if (!current || now - current.startedAt > 10 * 60 * 1000) {
     loginAttempts.set(key, { startedAt: now, count: 1 });
     return next();
