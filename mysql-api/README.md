@@ -41,3 +41,10 @@ Employee password hashes use the existing Worker format: SHA-256(Base64-decoded 
 - POST /api/password accepts currentPassword and newPassword.
 
 Errors keep the existing error field; selected validation and authorization errors also include a stable code field.
+
+
+## One-time admin bootstrap
+- Set `BOOTSTRAP_SECRET` in the local `.env` to a private random string of at least 32 characters. Never commit it or share it.
+- Restart the API, then send `POST /internal/bootstrap-admin` with header `X-Bootstrap-Secret: <your secret>` and JSON body `{"employeeId":"admin","displayName":"四小姐","password":"123456"}`.
+- This endpoint only creates an admin when no employee with role `admin` exists. It refuses to reset an existing admin and returns no password/hash.
+- After successful initialization, remove `BOOTSTRAP_SECRET` from `.env` and restart the API. Change the temporary password promptly; `123456` is not suitable for production.
