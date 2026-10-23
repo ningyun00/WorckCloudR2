@@ -31,14 +31,14 @@ const pool = mysql.createPool({
 const TOKEN_SECRET = process.env.TOKEN_SECRET || "";
 const fail = (res, status, error, code) => res.status(status).json({ error, ...(code ? { code } : {}) });
 const isRealDate = value => {
-  if (typeof value !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const d = new Date(value + "T00:00:00Z");
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
 };
 const isRealDateTime = value => {
-  if (typeof value !== "string" || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$/.test(value)) return false;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(value)) return false;
   if (!isRealDate(value.slice(0, 10))) return false;
-  const [, h, m, sec] = value.match(/T(\\d{2}):(\\d{2}):(\\d{2})$/) || [];
+  const [, h, m, sec] = value.match(/T(\d{2}):(\d{2}):(\d{2})$/) || [];
   return h !== undefined && Number(h) < 24 && Number(m) < 60 && Number(sec) < 60;
 };
 const normalizeRole = role => String(role || "").trim().toLowerCase();
@@ -126,6 +126,40 @@ app.post("/api/session", loginRateLimit, async (req, res) => {
     res.json({ token: issueToken(employee), employee: publicEmployee(employee) });
   } catch (e) { console.error("login failed", e.code || e.message); fail(res, 500, "登录服务暂时不可用"); }
 });
+
+/*
+ * One-time administrator bootstrap. Configure BOOTSTRAP_SECRET locally.
+ * Only creates admin when no admin account exists; never resets an existing admin.
+ */
+app.post("/internal/bootstrap-admin", async (req, res) => {
+  const configured = process.env.BOOTSTRAP_SECRET || "";
+  const supplied = req.get("X-Bootstrap-Secret") || "";
+  if (configured.length < 32 || supplied.length !== configured.length ||
+      !crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(configured))) {
+    return fail(res, 404, "接口不存在");
+  }
+  const { employeeId, password, displayName } = req.body || {};
+  if (employeeId !== "admin" || typeof password !== "string" || password.length < 6 ||
+      displayName !== "四小姐") {
+    return fail(res, 400, "初始化参数无效；密码至少 6 位");
+  }
+  try {
+    const [existing] = await pool.execute("SELECT employee_id FROM employees WHERE LOWER(role)='admin' LIMIT 1");
+    if (existing.length) return fail(res, 409, "管理员账号已存在；为安全起见，初始化接口不会重置账号");
+    const salt = crypto.randomBytes(16).toString("base64");
+    const hash = passwordDigest(salt, password).toString("base64");
+    await pool.execute(
+      "INSERT INTO employees (employee_id,display_name,enabled,must_change_password,password_hash,password_salt,role) VALUES (?,?,?,?,?,?,?)",
+      ["admin", displayName, 1, 1, hash, salt, "admin"]
+    );
+    res.status(201).json({ ok: true, employee: { employeeId: "admin", displayName: "四小姐", role: "admin", mustChangePassword: true } });
+  } catch (e) {
+    if (e.code === "ER_DUP_ENTRY") return fail(res, 409, "admin 账号已存在");
+    console.error("bootstrap admin failed", e.code || e.message);
+    fail(res, 500, "管理员初始化失败");
+  }
+});
+
 app.use("/api", authenticated);
 app.get("/api/config", async (_req, res) => {
   try {
