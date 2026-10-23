@@ -29,7 +29,32 @@ const pool = mysql.createPool({
   dateStrings: true
 });
 const TOKEN_SECRET = process.env.TOKEN_SECRET || "";
-const fail = (res, status, error) => res.status(status).json({ error });
+const fail = (res, status, error, code) => res.status(status).json({ error, ...(code ? { code } : {}) });
+const isRealDate = value => {
+  if (typeof value !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+  const d = new Date(value + "T00:00:00Z");
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+};
+const isRealDateTime = value => {
+  if (typeof value !== "string" || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$/.test(value)) return false;
+  if (!isRealDate(value.slice(0, 10))) return false;
+  const [, h, m, sec] = value.match(/T(\\d{2}):(\\d{2}):(\\d{2})$/) || [];
+  return h !== undefined && Number(h) < 24 && Number(m) < 60 && Number(sec) < 60;
+};
+const normalizeRole = role => String(role || "").trim().toLowerCase();
+const loginAttempts = new Map();
+const loginRateLimit = (req, res, next) => {
+  const key = req.ip || req.socket.remoteAddress || "unknown";
+  const now = Date.now();
+  const current = loginAttempts.get(key);
+  if (!current || now - current.startedAt > 10 * 60 * 1000) {
+    loginAttempts.set(key, { startedAt: now, count: 1 });
+    return next();
+  }
+  if (current.count >= 30) return fail(res, 429, "登录尝试过于频繁，请稍后再试", "RATE_LIMITED");
+  current.count += 1;
+  next();
+};
 const chinaParts = () => {
   const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit",
@@ -76,7 +101,7 @@ async function authenticated(req, res, next) {
     const [rows] = await pool.execute("SELECT employee_id,display_name,enabled,must_change_password,password_hash,password_salt,role FROM employees WHERE employee_id=? LIMIT 1", [session.employeeId]);
     const employee = rows[0];
     if (!employee || !employee.enabled) return fail(res, 401, "账号已停用或不存在");
-    req.session = { employeeId: String(employee.employee_id), role: employee.role || "" };
+    req.session = { employeeId: String(employee.employee_id), role: normalizeRole(employee.role) };
     req.employee = employee;
     next();
   } catch (e) { console.error("auth query failed", e.code || e.message); fail(res, 500, "读取员工信息失败"); }
@@ -91,13 +116,13 @@ app.get("/health", async (_req, res) => {
     res.json({ status: "ok", database: "connected" });
   } catch (e) { console.error("health check failed", e.code || e.message); fail(res, 503, "数据库或数据表尚未就绪"); }
 });
-app.post("/api/session", async (req, res) => {
+app.post("/api/session", loginRateLimit, async (req, res) => {
   const { employeeId, password } = req.body || {};
   if (typeof employeeId !== "string" || !employeeId || typeof password !== "string" || !password) return fail(res, 400, "工号和密码不能为空");
   try {
     const [rows] = await pool.execute("SELECT employee_id,display_name,enabled,must_change_password,password_hash,password_salt,role FROM employees WHERE employee_id=? LIMIT 1", [employeeId]);
     const employee = rows[0];
-    if (!employee || !employee.enabled || !verifyPassword(employee, password)) return fail(res, 401, "工号或密码错误");
+    if (!employee || !employee.enabled || !verifyPassword(employee, password)) return fail(res, 401, "工号或密码错误", "INVALID_CREDENTIALS");
     res.json({ token: issueToken(employee), employee: publicEmployee(employee) });
   } catch (e) { console.error("login failed", e.code || e.message); fail(res, 500, "登录服务暂时不可用"); }
 });
@@ -137,7 +162,7 @@ app.post("/api/attendance", async (req, res) => {
   }
 });
 app.post("/api/admin/attendance/makeup", async (req, res) => {
-  if (req.session.role !== "admin") return fail(res, 403, "仅管理员可以添加补班记录");
+  if (normalizeRole(req.session.role) !== "admin") return fail(res, 403, "仅管理员可以添加补班记录", "FORBIDDEN");
   const records = req.body?.records;
   if (!Array.isArray(records) || records.length < 2 || records.length > 100) return fail(res, 400, "补班记录格式无效");
   const seen = new Set();
@@ -174,9 +199,19 @@ app.post("/api/password", async (req, res) => {
     res.json({ ok: true });
   } catch (e) { console.error("password update failed", e.code || e.message); fail(res, 500, "密码保存失败，请重试"); }
 });
-app.use((_req, res) => fail(res, 404, "Not found"));
-app.use((err, _req, res, _next) => { console.error("request error", err); fail(res, 400, "请求格式无效"); });
+app.use((_req, res) => fail(res, 404, "接口不存在", "NOT_FOUND"));
+app.use((err, _req, res, _next) => { console.error("request error", err?.type || err?.name || "Error"); fail(res, 400, "请求格式无效", "INVALID_REQUEST"); });
 
 const port = Number(process.env.PORT || 3000);
 if (!TOKEN_SECRET) { console.error("缺少 TOKEN_SECRET，请在 .env 中配置随机密钥"); process.exit(1); }
-app.listen(port, "127.0.0.1", () => console.log(`WorkClockR2 MySQL API listening on 127.0.0.1:${port}`));
+const server = app.listen(port, "127.0.0.1", () => console.log(`WorkClockR2 MySQL API listening on 127.0.0.1:${port}`));
+async function shutdown(signal) {
+  console.log(`收到 ${signal}，正在安全关闭 API...`);
+  server.close(async () => {
+    try { await pool.end(); } catch (e) { console.error("关闭数据库连接池失败", e.code || e.message); }
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
